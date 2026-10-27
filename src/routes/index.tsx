@@ -15,17 +15,20 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Clima = "Bom" | "Nublado" | "Chuva" | "Impraticável";
-const CLIMAS: Clima[] = ["Bom", "Nublado", "Chuva", "Impraticável"];
-const CLIMA_ICON: Record<Clima, string> = { Bom: "☀️", Nublado: "☁️", Chuva: "🌧️", Impraticável: "⛔" };
+type Clima = "Bom" | "Nublado" | "Chuva fraca" | "Chuva forte";
+const CLIMAS: Clima[] = ["Bom", "Nublado", "Chuva fraca", "Chuva forte"];
+const CLIMA_ICON: Record<Clima, string> = { Bom: "☀️", Nublado: "☁️", "Chuva fraca": "🌦️", "Chuva forte": "⛈️" };
 const TURNOS = ["Manhã", "Tarde", "Noite"] as const;
+const COLETAS = ["07:00", "12:00", "17:00"] as const;
 
-type Row = { id: string; a: string; b: string };
+type Row = { id: string; a: string; b: string; c?: string };
 type Foto = { id: string; src: string; legenda: string };
 type RDO = {
   obra: string; cliente: string; endereco: string; contrato: string; responsavel: string;
   numero: string; data: string; inicio: string; prazo: string;
   clima: Record<string, Clima>;
+  pluvio: Record<string, string>;
+  mareHora: string; mareNivel: string;
   horario: string;
   maoDeObra: Row[]; equipamentos: Row[]; atividades: Row[];
   ocorrencias: string; seguranca: string;
@@ -39,13 +42,23 @@ const vazio = (): RDO => ({
   obra: "", cliente: "", endereco: "", contrato: "", responsavel: "",
   numero: "001", data: hoje(), inicio: "", prazo: "",
   clima: { Manhã: "Bom", Tarde: "Bom", Noite: "Bom" },
+  pluvio: { "07:00": "", "12:00": "", "17:00": "" },
+  mareHora: "", mareNivel: "",
   horario: "07:00 às 17:00",
-  maoDeObra: [{ id: uid(), a: "Pedreiro", b: "4" }, { id: uid(), a: "Servente", b: "6" }],
+  maoDeObra: [
+    { id: uid(), a: "Pedreiro", b: "4", c: "Direto" },
+    { id: uid(), a: "Servente", b: "6", c: "Direto" },
+    { id: uid(), a: "Mestre de obras", b: "1", c: "Indireto" },
+  ],
   equipamentos: [{ id: uid(), a: "Betoneira 400L", b: "1" }],
   atividades: [{ id: uid(), a: "", b: "" }],
   ocorrencias: "", seguranca: "", fotos: [], assResp: "", assFiscal: "",
 });
-const KEY = "rdo-atual-v1";
+const somaTipo = (r: RDO, t: string) =>
+  r.maoDeObra.filter((m) => (m.c ?? "Direto") === t).reduce((s, m) => s + (Number(m.b) || 0), 0);
+const mareTxt = (r: RDO) =>
+  r.mareHora || r.mareNivel ? `${r.mareHora || "--:--"} - ${(r.mareNivel || "0").replace(".", ",")} m` : "—";
+const KEY = "rdo-atual-v2";
 const fmt = (d: string) => (d ? d.split("-").reverse().join("/") : "—");
 const diaSemana = (d: string) =>
   d ? new Date(d + "T12:00").toLocaleDateString("pt-BR", { weekday: "long" }) : "";
@@ -140,11 +153,54 @@ function Index() {
                 </div>
               ))}
               <F label="Horário de trabalho"><input className="field max-w-xs" value={r.horario} onChange={(e) => set("horario", e.target.value)} /></F>
+              <div>
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pluviômetro (mm)</span>
+                <div className="grid grid-cols-3 gap-2">
+                  {COLETAS.map((h) => (
+                    <label key={h} className="block">
+                      <span className="text-xs font-semibold">{h}</span>
+                      <input className="field" inputMode="decimal" placeholder="0,0" value={r.pluvio[h] ?? ""} onChange={(e) => set("pluvio", { ...r.pluvio, [h]: e.target.value })} />
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tábua de maré · nível máximo</span>
+                <div className="grid grid-cols-2 gap-2 sm:max-w-sm">
+                  <label className="block"><span className="text-xs font-semibold">Horário</span><input type="time" className="field" value={r.mareHora} onChange={(e) => set("mareHora", e.target.value)} /></label>
+                  <label className="block"><span className="text-xs font-semibold">Nível (m)</span><input className="field" inputMode="decimal" placeholder="2,85" value={r.mareNivel} onChange={(e) => set("mareNivel", e.target.value)} /></label>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">Registro: <b className="text-foreground">{mareTxt(r)}</b></p>
+              </div>
             </div>
           </Section>
 
-          <Section n="3" title={`Mão de obra · ${totalEquipe} pessoas`}>
-            <Rows rows={r.maoDeObra} onChange={(v) => set("maoDeObra", v)} la="Função" lb="Qtd." pb="0" numeric />
+          <Section n="3" title={`Mão de obra · Efetivo ${totalEquipe}`}>
+            <div className="mb-3 grid grid-cols-3 gap-2 text-center">
+              {[["Direto", somaTipo(r, "Direto")], ["Indireto", somaTipo(r, "Indireto")], ["Efetivo total", totalEquipe]].map(([l, v], i) => (
+                <div key={l} className={`rounded-lg border px-2 py-2 ${i === 2 ? "bg-navy text-navy-foreground" : "bg-muted"}`}>
+                  <div className="text-[10px] font-semibold uppercase opacity-80">{l}</div>
+                  <div className="font-display text-2xl font-bold">{v}</div>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-2">
+              <div className="flex gap-2 text-xs font-semibold uppercase text-muted-foreground"><span className="flex-1">Função</span><span className="w-28">Efetivo</span><span className="w-20">Qtd.</span><span className="w-9" /></div>
+              {r.maoDeObra.map((x) => {
+                const up = (k: "a" | "b" | "c", v: string) => set("maoDeObra", r.maoDeObra.map((y) => (y.id === x.id ? { ...y, [k]: v } : y)));
+                return (
+                  <div key={x.id} className="flex gap-2">
+                    <input className="field flex-1" value={x.a} onChange={(e) => up("a", e.target.value)} />
+                    <select className="field w-28" value={x.c ?? "Direto"} onChange={(e) => up("c", e.target.value)}>
+                      <option>Direto</option><option>Indireto</option>
+                    </select>
+                    <input className="field w-20" inputMode="numeric" placeholder="0" value={x.b} onChange={(e) => up("b", e.target.value)} />
+                    <button onClick={() => set("maoDeObra", r.maoDeObra.filter((y) => y.id !== x.id))} className="w-9 rounded-md border text-muted-foreground hover:text-destructive" aria-label="Remover">×</button>
+                  </div>
+                );
+              })}
+              <button onClick={() => set("maoDeObra", [...r.maoDeObra, { id: uid(), a: "", b: "", c: "Direto" }])} className="text-sm font-semibold text-accent-foreground hover:underline">+ Adicionar função</button>
+            </div>
           </Section>
 
           <Section n="4" title="Equipamentos">
@@ -282,11 +338,31 @@ function PrintView({ r, total }: { r: RDO; total: number }) {
           </div>
         ))}
       </div>
+      <div className="mt-2 grid grid-cols-4 gap-2">
+        {COLETAS.map((h) => (
+          <div key={h} className="rounded border px-2 py-1.5 text-center">
+            <div className="text-[9px] uppercase text-muted-foreground">Pluviômetro {h}</div>
+            <div className="font-semibold">{r.pluvio[h] ? `${r.pluvio[h]} mm` : "—"}</div>
+          </div>
+        ))}
+        <div className="rounded border border-safety px-2 py-1.5 text-center">
+          <div className="text-[9px] uppercase text-muted-foreground">Maré máxima</div>
+          <div className="font-semibold">{mareTxt(r)}</div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="avoid-break">
-          <PH>Mão de obra · {total} pessoas</PH>
-          <PTable rows={filled(r.maoDeObra)} ha="Função" hb="Qtd." />
+          <PH>Mão de obra · Efetivo {total}</PH>
+          <table className="w-full border-collapse">
+            <thead><tr className="bg-muted text-left"><th className="px-2 py-1">Função</th><th className="px-2 py-1">Efetivo</th><th className="w-12 px-2 py-1 text-right">Qtd.</th></tr></thead>
+            <tbody>
+              {filled(r.maoDeObra).map((x) => <tr key={x.id} className="border-b"><td className="px-2 py-1">{x.a}</td><td className="px-2 py-1">{x.c ?? "Direto"}</td><td className="px-2 py-1 text-right font-semibold">{x.b}</td></tr>)}
+              <tr className="bg-muted"><td className="px-2 py-1 font-semibold" colSpan={2}>Direto</td><td className="px-2 py-1 text-right font-semibold">{somaTipo(r, "Direto")}</td></tr>
+              <tr className="bg-muted"><td className="px-2 py-1 font-semibold" colSpan={2}>Indireto</td><td className="px-2 py-1 text-right font-semibold">{somaTipo(r, "Indireto")}</td></tr>
+              <tr className="bg-navy text-navy-foreground"><td className="px-2 py-1 font-bold" colSpan={2}>Efetivo total</td><td className="px-2 py-1 text-right font-bold">{total}</td></tr>
+            </tbody>
+          </table>
         </div>
         <div className="avoid-break">
           <PH>Equipamentos</PH>
