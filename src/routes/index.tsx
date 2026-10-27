@@ -159,7 +159,7 @@ function Index() {
                   {COLETAS.map((h) => (
                     <label key={h} className="block">
                       <span className="text-xs font-semibold">{h}</span>
-                      <input className="field" inputMode="decimal" placeholder="0,0" value={r.pluvio[h] ?? ""} onChange={(e) => set("pluvio", { ...r.pluvio, [h]: e.target.value })} />
+                      <input className="field" inputMode="decimal" placeholder="0,0" value={r.pluvio?.[h] ?? ""} onChange={(e) => set("pluvio", { ...(r.pluvio ?? {}), [h]: e.target.value })} />
                     </label>
                   ))}
                 </div>
@@ -342,7 +342,7 @@ function PrintView({ r, total }: { r: RDO; total: number }) {
         {COLETAS.map((h) => (
           <div key={h} className="rounded border px-2 py-1.5 text-center">
             <div className="text-[9px] uppercase text-muted-foreground">Pluviômetro {h}</div>
-            <div className="font-semibold">{r.pluvio[h] ? `${r.pluvio[h]} mm` : "—"}</div>
+            <div className="font-semibold">{r.pluvio?.[h] ? `${r.pluvio?.[h]} mm` : "—"}</div>
           </div>
         ))}
         <div className="rounded border border-safety px-2 py-1.5 text-center">
