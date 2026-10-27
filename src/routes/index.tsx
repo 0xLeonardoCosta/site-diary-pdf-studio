@@ -278,7 +278,7 @@ function PrintView({ r, total }: { r: RDO; total: number }) {
         {TURNOS.map((t) => (
           <div key={t} className="rounded border px-2 py-1.5 text-center">
             <div className="text-[9px] uppercase text-muted-foreground">{t}</div>
-            <div className="font-semibold">{CLIMA_ICON[r.clima[t]]} {r.clima[t]}</div>
+            <div className="font-semibold">{CLIMA_ICON[r.clima[t] ?? "Bom"]} {r.clima[t] ?? "Bom"}</div>
           </div>
         ))}
       </div>
