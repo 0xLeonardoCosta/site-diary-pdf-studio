@@ -67,21 +67,21 @@ const diaSemana = (d: string) =>
   d ? new Date(d + "T12:00").toLocaleDateString("pt-BR", { weekday: "long" }) : "";
 
 function Index() {
-  const { perfil } = useAuth();
+  const { perfil } = Route.useRouteContext();
   const useObra = usePermissao("editar_obra");
   const exportar = usePermissao("exportar_pdf");
   const alterarData = usePermissao("alterar_numero_data");
-  const key = `${KEY}:${perfil?.id ?? ""}`;
+  const key = `${KEY}:${perfil.id}`;
   const [r, setR] = useState<RDO>(vazio);
-  const [ok, setOk] = useState(false);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   useEffect(() => {
-    try { const s = localStorage.getItem(key); if (s) setR({ ...vazio(), ...JSON.parse(s) }); } catch {}
-    setOk(true);
+    try { const s = localStorage.getItem(key); setR(s ? { ...vazio(), ...JSON.parse(s) } : vazio()); } catch { setR(vazio()); }
+    setLoadedKey(key);
   }, [key]);
   useEffect(() => {
-    if (!ok) return;
+    if (loadedKey !== key) return;
     try { localStorage.setItem(key, JSON.stringify(r)); } catch {}
-  }, [r, ok, key]);
+  }, [r, loadedKey, key]);
 
   const set = <K extends keyof RDO>(k: K, v: RDO[K]) => setR((p) => ({ ...p, [k]: v }));
   const totalEquipe = r.maoDeObra.reduce((s, m) => s + (Number(m.b) || 0), 0);

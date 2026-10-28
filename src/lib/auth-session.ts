@@ -6,7 +6,7 @@ export async function carregarPerfil(): Promise<Perfil | null> {
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) return null;
   const result = await supabase.from('profiles').select('*').eq('id', user.id).single();
-  if (result.error) throw result.error;
+  if (result.error) throw new Error(result.error.message);
   if (!result.data.ativo) {
     await supabase.auth.signOut();
     throw new Error(CONTA_DESATIVADA);
