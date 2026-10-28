@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
+import { useAuth, usePermissao } from "@/components/auth-context";
+import { Button } from "@/components/ui/button";
+import type { Permissao } from "@/lib/auth-rules";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
       { title: "RDO – Relatório Diário de Obra | Preencha e exporte em PDF" },
@@ -64,16 +67,21 @@ const diaSemana = (d: string) =>
   d ? new Date(d + "T12:00").toLocaleDateString("pt-BR", { weekday: "long" }) : "";
 
 function Index() {
+  const { perfil } = useAuth();
+  const useObra = usePermissao("editar_obra");
+  const exportar = usePermissao("exportar_pdf");
+  const alterarData = usePermissao("alterar_numero_data");
+  const key = `${KEY}:${perfil?.id ?? ""}`;
   const [r, setR] = useState<RDO>(vazio);
   const [ok, setOk] = useState(false);
   useEffect(() => {
-    try { const s = localStorage.getItem(KEY); if (s) setR({ ...vazio(), ...JSON.parse(s) }); } catch {}
+    try { const s = localStorage.getItem(key); if (s) setR({ ...vazio(), ...JSON.parse(s) }); } catch {}
     setOk(true);
-  }, []);
+  }, [key]);
   useEffect(() => {
     if (!ok) return;
-    try { localStorage.setItem(KEY, JSON.stringify(r)); } catch {}
-  }, [r, ok]);
+    try { localStorage.setItem(key, JSON.stringify(r)); } catch {}
+  }, [r, ok, key]);
 
   const set = <K extends keyof RDO>(k: K, v: RDO[K]) => setR((p) => ({ ...p, [k]: v }));
   const totalEquipe = r.maoDeObra.reduce((s, m) => s + (Number(m.b) || 0), 0);
@@ -87,7 +95,9 @@ function Index() {
         const max = 1200, k = Math.min(1, max / Math.max(img.width, img.height));
         const c = document.createElement("canvas");
         c.width = img.width * k; c.height = img.height * k;
-        c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+        const context = c.getContext("2d");
+        if (!context) { URL.revokeObjectURL(url); return; }
+        context.drawImage(img, 0, 0, c.width, c.height);
         const src = c.toDataURL("image/jpeg", 0.75);
         URL.revokeObjectURL(url);
         setR((p) => ({ ...p, fotos: [...p.fotos, { id: uid(), src, legenda: "" }] }));
@@ -115,28 +125,28 @@ function Index() {
               <h1 className="font-display text-3xl font-bold uppercase sm:text-4xl">RDO nº {r.numero || "—"}</h1>
               <p className="text-sm opacity-80">{fmt(r.data)} · {diaSemana(r.data)}</p>
             </div>
-            <button onClick={novoDia} className="rounded-md border border-navy-foreground/30 px-3 py-2 text-sm font-medium hover:bg-navy-foreground/10">
+            <Button disabled={!alterarData} onClick={novoDia} className="rounded-md border border-navy-foreground/30 px-3 py-2 text-sm font-medium hover:bg-navy-foreground/10">
               + Próximo dia
-            </button>
+            </Button>
           </div>
         </header>
 
         <main className="mx-auto max-w-4xl space-y-5 px-4 py-6">
           <Section n="1" title="Dados da obra">
             <div className="grid gap-3 sm:grid-cols-2">
-              <F label="Obra"><input className="field" value={r.obra} onChange={(e) => set("obra", e.target.value)} placeholder="Ex.: Residencial Bela Vista" /></F>
-              <F label="Cliente / Contratante"><input className="field" value={r.cliente} onChange={(e) => set("cliente", e.target.value)} /></F>
-              <F label="Endereço" wide><input className="field" value={r.endereco} onChange={(e) => set("endereco", e.target.value)} /></F>
-              <F label="Responsável técnico"><input className="field" value={r.responsavel} onChange={(e) => set("responsavel", e.target.value)} placeholder="Eng. Nome – CREA" /></F>
-              <F label="Contrato / ART"><input className="field" value={r.contrato} onChange={(e) => set("contrato", e.target.value)} /></F>
-              <F label="Nº do RDO"><input className="field" value={r.numero} onChange={(e) => set("numero", e.target.value)} /></F>
-              <F label="Data"><input type="date" className="field" value={r.data} onChange={(e) => set("data", e.target.value)} /></F>
-              <F label="Início da obra"><input type="date" className="field" value={r.inicio} onChange={(e) => set("inicio", e.target.value)} /></F>
-              <F label="Prazo previsto"><input type="date" className="field" value={r.prazo} onChange={(e) => set("prazo", e.target.value)} /></F>
+              <F label="Obra"><input className="field" disabled={!useObra} value={r.obra} onChange={(e) => set("obra", e.target.value)} placeholder="Ex.: Residencial Bela Vista" /></F>
+              <F label="Cliente / Contratante"><input className="field" disabled={!useObra} value={r.cliente} onChange={(e) => set("cliente", e.target.value)} /></F>
+              <F label="Endereço" wide><input className="field" disabled={!useObra} value={r.endereco} onChange={(e) => set("endereco", e.target.value)} /></F>
+              <F label="Responsável técnico"><input className="field" disabled={!useObra} value={r.responsavel} onChange={(e) => set("responsavel", e.target.value)} placeholder="Eng. Nome – CREA" /></F>
+              <F label="Contrato / ART"><input className="field" disabled={!useObra} value={r.contrato} onChange={(e) => set("contrato", e.target.value)} /></F>
+              <F label="Nº do RDO"><input className="field" disabled={!alterarData} value={r.numero} onChange={(e) => set("numero", e.target.value)} /></F>
+              <F label="Data"><input type="date" className="field" disabled={!alterarData} value={r.data} onChange={(e) => set("data", e.target.value)} /></F>
+              <F label="Início da obra"><input type="date" className="field" disabled={!useObra} value={r.inicio} onChange={(e) => set("inicio", e.target.value)} /></F>
+              <F label="Prazo previsto"><input type="date" className="field" disabled={!useObra} value={r.prazo} onChange={(e) => set("prazo", e.target.value)} /></F>
             </div>
           </Section>
 
-          <Section n="2" title="Condições climáticas">
+          <Section permissao="lancar_clima" n="2" title="Condições climáticas">
             <div className="space-y-3">
               {TURNOS.map((t) => (
                 <div key={t} className="flex flex-wrap items-center gap-2">
@@ -144,10 +154,10 @@ function Index() {
                   {CLIMAS.map((c) => {
                     const on = r.clima[t] === c;
                     return (
-                      <button key={c} onClick={() => set("clima", { ...r.clima, [t]: c })}
+                      <Button key={c} onClick={() => set("clima", { ...r.clima, [t]: c })}
                         className={`rounded-full border px-3 py-1.5 text-sm transition ${on ? "border-safety bg-safety text-safety-foreground font-semibold" : "bg-card hover:border-safety"}`}>
                         {CLIMA_ICON[c]} {c}
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -175,7 +185,7 @@ function Index() {
             </div>
           </Section>
 
-          <Section n="3" title={`Mão de obra · Efetivo ${totalEquipe}`}>
+          <Section permissao="lancar_mao_obra" n="3" title={`Mão de obra · Efetivo ${totalEquipe}`}>
             <div className="mb-3 grid grid-cols-3 gap-2 text-center">
               {[["Direto", somaTipo(r, "Direto")], ["Indireto", somaTipo(r, "Indireto")], ["Efetivo total", totalEquipe]].map(([l, v], i) => (
                 <div key={l} className={`rounded-lg border px-2 py-2 ${i === 2 ? "bg-navy text-navy-foreground" : "bg-muted"}`}>
@@ -195,30 +205,30 @@ function Index() {
                       <option>Direto</option><option>Indireto</option>
                     </select>
                     <input className="field w-20" inputMode="numeric" placeholder="0" value={x.b} onChange={(e) => up("b", e.target.value)} />
-                    <button onClick={() => set("maoDeObra", r.maoDeObra.filter((y) => y.id !== x.id))} className="w-9 rounded-md border text-muted-foreground hover:text-destructive" aria-label="Remover">×</button>
+                    <Button onClick={() => set("maoDeObra", r.maoDeObra.filter((y) => y.id !== x.id))} className="w-9 rounded-md border text-muted-foreground hover:text-destructive" aria-label="Remover">×</Button>
                   </div>
                 );
               })}
-              <button onClick={() => set("maoDeObra", [...r.maoDeObra, { id: uid(), a: "", b: "", c: "Direto" }])} className="text-sm font-semibold text-accent-foreground hover:underline">+ Adicionar função</button>
+              <Button onClick={() => set("maoDeObra", [...r.maoDeObra, { id: uid(), a: "", b: "", c: "Direto" }])} className="text-sm font-semibold text-accent-foreground hover:underline">+ Adicionar função</Button>
             </div>
           </Section>
 
-          <Section n="4" title="Equipamentos">
+          <Section permissao="lancar_equipamentos" n="4" title="Equipamentos">
             <Rows rows={r.equipamentos} onChange={(v) => set("equipamentos", v)} la="Equipamento" lb="Qtd." pb="0" numeric />
           </Section>
 
-          <Section n="5" title="Atividades executadas">
+          <Section permissao="lancar_atividades" n="5" title="Atividades executadas">
             <Rows rows={r.atividades} onChange={(v) => set("atividades", v)} la="Descrição do serviço" lb="% avanço" pb="0-100" numeric />
           </Section>
 
-          <Section n="6" title="Ocorrências e observações">
+          <Section permissao="lancar_atividades" n="6" title="Ocorrências e observações">
             <div className="grid gap-3">
               <F label="Ocorrências / observações gerais"><textarea rows={4} className="field" value={r.ocorrencias} onChange={(e) => set("ocorrencias", e.target.value)} placeholder="Atrasos de material, visitas, interferências..." /></F>
               <F label="Segurança do trabalho"><textarea rows={2} className="field" value={r.seguranca} onChange={(e) => set("seguranca", e.target.value)} placeholder="Uso de EPIs, DDS realizado, incidentes..." /></F>
             </div>
           </Section>
 
-          <Section n="7" title={`Registro fotográfico · ${r.fotos.length}`}>
+          <Section permissao="lancar_atividades" n="7" title={`Registro fotográfico · ${r.fotos.length}`}>
             <label className="flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-safety/60 bg-accent px-4 py-6 text-sm font-semibold text-accent-foreground hover:bg-accent/70">
               📷 Adicionar fotos
               <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { addFotos(e.target.files); e.target.value = ""; }} />
@@ -228,7 +238,7 @@ function Index() {
                 <div key={f.id} className="overflow-hidden rounded-lg border bg-card">
                   <div className="relative">
                     <img src={f.src} alt={f.legenda || "Foto da obra"} className="aspect-[4/3] w-full object-cover" />
-                    <button onClick={() => set("fotos", r.fotos.filter((x) => x.id !== f.id))} className="absolute right-1 top-1 rounded bg-destructive px-2 text-sm text-destructive-foreground">×</button>
+                    <Button onClick={() => set("fotos", r.fotos.filter((x) => x.id !== f.id))} className="absolute right-1 top-1 rounded bg-destructive px-2 text-sm text-destructive-foreground">×</Button>
                   </div>
                   <input className="w-full border-t bg-card px-2 py-1.5 text-sm outline-none" placeholder="Legenda" value={f.legenda}
                     onChange={(e) => set("fotos", r.fotos.map((x) => (x.id === f.id ? { ...x, legenda: e.target.value } : x)))} />
@@ -237,7 +247,7 @@ function Index() {
             </div>
           </Section>
 
-          <Section n="8" title="Assinaturas">
+          <Section permissao="fechar_reabrir" n="8" title="Assinaturas">
             <div className="grid gap-3 sm:grid-cols-2">
               <F label="Responsável pela obra"><input className="field" value={r.assResp} onChange={(e) => set("assResp", e.target.value)} /></F>
               <F label="Fiscalização / Cliente"><input className="field" value={r.assFiscal} onChange={(e) => set("assFiscal", e.target.value)} /></F>
@@ -247,27 +257,28 @@ function Index() {
 
         <div className="fixed inset-x-0 bottom-0 border-t bg-card/95 backdrop-blur">
           <div className="mx-auto flex max-w-4xl gap-3 px-4 py-3">
-            <button onClick={() => confirm("Limpar todo o formulário?") && setR(vazio())} className="rounded-md border px-4 py-3 text-sm font-medium">Limpar</button>
-            <button onClick={() => window.print()} className="flex-1 rounded-md bg-safety px-4 py-3 font-display text-lg font-bold uppercase text-safety-foreground shadow-lg hover:brightness-105">
+            <Button disabled={!useObra || !alterarData} onClick={() => confirm("Limpar todo o formulário?") && setR(vazio())} className="rounded-md border px-4 py-3 text-sm font-medium">Limpar</Button>
+            <Button disabled={!exportar} onClick={() => window.print()} className="flex-1 rounded-md bg-safety px-4 py-3 font-display text-lg font-bold uppercase text-safety-foreground shadow-lg hover:brightness-105">
               Exportar PDF
-            </button>
+            </Button>
           </div>
         </div>
       </div>
 
-      <PrintView r={r} total={totalEquipe} />
+      {exportar && <PrintView r={r} total={totalEquipe} />}
     </>
   );
 }
 
-function Section({ n, title, children }: { n: string; title: string; children: ReactNode }) {
+function Section({ n, title, children, permissao }: { n: string; title: string; children: ReactNode; permissao?: Permissao }) {
+  const permitido = usePermissao(permissao ?? "editar_obra");
   return (
     <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-5">
       <h2 className="mb-4 flex items-center gap-3 font-display text-xl font-bold uppercase text-primary">
         <span className="grid h-8 w-8 place-items-center rounded bg-safety text-base text-safety-foreground">{n}</span>
         {title}
       </h2>
-      {children}
+      <fieldset disabled={Boolean(permissao && !permitido)} className="min-w-0">{children}</fieldset>
     </section>
   );
 }
@@ -290,10 +301,10 @@ function Rows({ rows, onChange, la, lb, pb, numeric }: { rows: Row[]; onChange: 
         <div key={x.id} className="flex gap-2">
           <input className="field flex-1" value={x.a} onChange={(e) => up(x.id, "a", e.target.value)} />
           <input className="field w-24" inputMode={numeric ? "numeric" : undefined} placeholder={pb} value={x.b} onChange={(e) => up(x.id, "b", e.target.value)} />
-          <button onClick={() => onChange(rows.filter((y) => y.id !== x.id))} className="w-9 rounded-md border text-muted-foreground hover:text-destructive" aria-label="Remover">×</button>
+          <Button onClick={() => onChange(rows.filter((y) => y.id !== x.id))} className="w-9 rounded-md border text-muted-foreground hover:text-destructive" aria-label="Remover">×</Button>
         </div>
       ))}
-      <button onClick={() => onChange([...rows, { id: uid(), a: "", b: "" }])} className="text-sm font-semibold text-accent-foreground hover:underline">+ Adicionar linha</button>
+      <Button onClick={() => onChange([...rows, { id: uid(), a: "", b: "" }])} className="text-sm font-semibold text-accent-foreground hover:underline">+ Adicionar linha</Button>
     </div>
   );
 }
