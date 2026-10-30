@@ -10,7 +10,7 @@ import { ObraProvider, useReferencia } from '@/components/rdo/reference';
 import { RdoErro, RdoNaoEncontrado } from '@/components/rdo/query-error';
 
 export const Route = createFileRoute('/_authenticated/historico')({
-  validateSearch: (search: Record<string, unknown>) => ({ mes: typeof search.mes === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(search.mes) ? search.mes : '' }),
+  validateSearch: (search: Record<string, unknown>) => ({ mes: typeof search['mes'] === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(search['mes']) ? search['mes'] : '' }),
   loaderDeps: ({ search }) => ({ mes: search.mes }),
   loader: async ({ context, deps }) => { await Promise.all([
     context.queryClient.ensureQueryData(referenciaQuery(context.perfil.id)),

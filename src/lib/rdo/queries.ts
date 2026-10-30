@@ -30,7 +30,6 @@ export const diaQuery = (userId: string, date: string) => queryOptions({
     return { rdo: data, maoObra: rows };
   },
 });
-export type DiaBanco = Awaited<ReturnType<ReturnType<typeof diaQuery>['queryFn'] & (() => Promise<{rdo: RdoBanco | null; maoObra: MaoObraBanco[]}>)>>;
 export const TAMANHO_PAGINA = 30;
 export const historicoQuery = (userId: string, mes: string) => infiniteQueryOptions({
   queryKey: ['rdo', userId, 'historico', mes], initialPageParam: 0,
@@ -46,10 +45,10 @@ export const historicoQuery = (userId: string, mes: string) => infiniteQueryOpti
     const ids = data.map(r => r.id);
     const totais: Record<string, number> = {};
     if (ids.length) {
-      const mao = await supabase.from('mao_obra').select('rdo_id, quantidade').in('rdo_id', ids);
+      const mao = await supabase.from('mao_obra').select('rdo_id, quantidade', { count: 'exact' }).in('rdo_id', ids);
       if (mao.error) throw mao.error;
       // The API caps responses: do not display a silently truncated total.
-      if (mao.data.length === 1000) throw new Error('O efetivo deste lote excedeu o limite de consulta. Selecione um mês com menos registros.');
+      if (mao.count !== null && mao.count > mao.data.length) throw new Error('O efetivo deste lote excedeu o limite de consulta. Selecione um mês com menos registros.');
       for (const row of mao.data) totais[row.rdo_id] = (totais[row.rdo_id] ?? 0) + row.quantidade;
     }
     return { rows: data.map(r => ({ ...r, total: totais[r.id] ?? 0 })), next: data.length === TAMANHO_PAGINA ? pageParam + TAMANHO_PAGINA : undefined };
