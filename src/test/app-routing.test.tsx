@@ -14,4 +14,9 @@ describe("App routing", () => {
 
     expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
   });
+  it('matches dated RDO and history pages inside the authenticated layout', () => {
+    const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
+    expect(router.matchRoutes('/rdo/2026-10-29').at(-1)?.routeId).toBe('/_authenticated/rdo/$data');
+    expect(router.matchRoutes('/historico').at(-1)?.routeId).toBe('/_authenticated/historico');
+  });
 });

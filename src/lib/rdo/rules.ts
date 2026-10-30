@@ -1,5 +1,5 @@
 const MS = 86400000;
-const utc = (iso: string) => { const [y,m,d] = iso.split("-").map(Number); return Date.UTC(y, m-1, d); };
+const utc = (iso: string) => { const [y,m,d] = iso.split("-").map(Number) as [number, number, number]; return Date.UTC(y, m-1, d); };
 const iso = (ms: number) => new Date(ms).toISOString().slice(0,10);
 export const numeroParaData = (n: number, refN: number, refD: string) => iso(utc(refD) + (n - refN) * MS);
 export const dataParaNumero = (d: string, refN: number, refD: string) => refN + Math.round((utc(d) - utc(refD)) / MS);
@@ -9,6 +9,7 @@ export const somaDias = (d: string, n: number) => iso(utc(d) + n * MS);
 export function dataValida(d: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
   const [y, m, day] = d.split('-').map(Number);
+  if (y === undefined || m === undefined || day === undefined) return false;
   return y >= 1000 && y <= 9999 && m >= 1 && m <= 12 && day >= 1 && day <= 31 && iso(utc(d)) === d;
 }
 export const numeroValido = (n: string) => /^-?\d+$/.test(n) && Number.isSafeInteger(Number(n));

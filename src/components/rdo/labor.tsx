@@ -23,6 +23,7 @@ export function MaoObra({ rdo, rows, userId, date }: { rdo: RdoBanco | null; row
     client.setQueryData<{ rdo: RdoBanco | null; maoObra: MaoObraBanco[] }>(key, old => old ? { ...old, maoObra: alterar(old.maoObra) } : old);
   };
   const salvar = useMutation({
+    mutationKey: ['rdo-labor', userId, date],
     mutationFn: async ({ linha, remover }: { linha: Linha; remover?: boolean }) => {
       if (!rdo) throw new Error('Crie o RDO antes de lançar mão de obra.');
       if (remover) {
@@ -54,6 +55,7 @@ export function MaoObra({ rdo, rows, userId, date }: { rdo: RdoBanco | null; row
     await client.cancelQueries({ queryKey: key });
     const anterior = rows.find(r => r.id === linha.id);
     if (anterior) atualizarCache(p => remover ? p.filter(r => r.id !== linha.id) : p.map(r => r.id === linha.id ? { ...r, ...linha } : r));
+    if (linha.nova) setNovas(p => p.map(r => r.id === linha.id ? linha : r));
     // New rows are already visible as local optimistic entries.
     try {
       const result = await salvar.mutateAsync({ linha, remover });
@@ -63,15 +65,16 @@ export function MaoObra({ rdo, rows, userId, date }: { rdo: RdoBanco | null; row
       return true;
     } catch (error) {
       if (anterior) atualizarCache(p => remover ? [...p, anterior] : p.map(r => r.id === linha.id ? anterior : r));
+      if (linha.nova) setNovas(p => p.map(r => r.id === linha.id ? { ...r, funcao: '', quantidade: 0 } : r));
       toast.error(mensagemErro(error));
       return false;
     } finally { busy.current.delete(linha.id); }
   }
   return <div className="space-y-5">
-    <div className="flex items-center justify-between border-b pb-3"><span className="font-semibold">Efetivo total</span><strong className="font-display text-3xl">{totalEfetivo(rows)}</strong></div>
+    <div className="flex items-center justify-between border-b pb-3"><span className="font-semibold">Efetivo total</span><strong className="font-display text-3xl">{totalEfetivo(todas)}</strong></div>
     {!rdo && <p className="text-sm text-muted-foreground">Crie o RDO para lançar mão de obra.</p>}
     {CATEGORIAS.map(categoria => <div key={categoria} className="space-y-2">
-      <div className="flex items-center justify-between"><h3 className="font-semibold">{ROTULOS[categoria]}</h3><span className="text-sm">Subtotal: <b>{totalCategoria(rows, categoria)}</b></span></div>
+      <div className="flex items-center justify-between"><h3 className="font-semibold">{ROTULOS[categoria]}</h3><span className="text-sm">Subtotal: <b>{totalCategoria(todas, categoria)}</b></span></div>
       {todas.filter(r => r.categoria === categoria).map(linha => <LinhaMaoObra key={linha.id} linha={linha} editavel={editavel} salvar={persistir} />)}
       {!todas.some(r => r.categoria === categoria) && <p className="text-sm text-muted-foreground">Nenhuma função registrada.</p>}
       {editavel && <Button variant="ghost" size="sm" onClick={() => setNovas(p => [...p, { id: crypto.randomUUID(), funcao: '', quantidade: 0, categoria, nova: true }])}><Plus />Adicionar função</Button>}
@@ -98,6 +101,6 @@ function LinhaMaoObra({ linha, editavel, salvar }: { linha: Linha; editavel: boo
   return <div className="grid grid-cols-[minmax(0,1fr)_5rem_2.25rem] items-start gap-2">
     <div><input id={`funcao-${linha.id}`} aria-label={`Função ${ROTULOS[linha.categoria as Categoria]}`} className="field min-w-0" disabled={!editavel || estado === 'Salvando…'} value={funcao} onChange={e => { setFuncao(e.target.value); setEstado('Não salvo'); }} onBlur={() => void gravar()} /><span aria-live="polite" className="text-xs text-muted-foreground">{estado}</span></div>
     <input aria-label={`Quantidade ${funcao || ROTULOS[linha.categoria as Categoria]}`} className="field min-w-0" type="number" min="0" step="1" disabled={!editavel || estado === 'Salvando…'} value={qtd} onChange={e => { setQtd(e.target.value); setEstado('Não salvo'); }} onBlur={() => void gravar()} />
-    {editavel && <Button variant="ghost" size="icon" disabled={estado === 'Salvando…'} aria-label={`Excluir ${funcao || 'função'}`} onClick={() => void gravar(true)}><Trash2 className="size-4" /></Button>}
+    {editavel && <Button variant="ghost" size="icon" disabled={estado === 'Salvando…'} aria-label={`Excluir ${funcao || 'função'}`} onMouseDown={e => e.preventDefault()} onClick={() => void gravar(true)}><Trash2 className="size-4" /></Button>}
   </div>;
 }
