@@ -1,22 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { MaoObra } from "./labor";
+import { chaveLocal, hojeLocal, CATEGORIAS, ROTULOS, totalCategoria, totalEfetivo } from "@/lib/rdo/rules";
+import type { MaoObraBanco, RdoBanco } from "@/lib/rdo/queries";
 import { useEffect, useState, type ReactNode } from "react";
-import { useAuth, usePermissao } from "@/components/auth-context";
+import { usePermissao } from "@/components/auth-context";
 import { Button } from "@/components/ui/button";
 import type { Permissao } from "@/lib/auth-rules";
-
-export const Route = createFileRoute("/_authenticated/")({
-  head: () => ({
-    meta: [
-      { title: "RDO – Relatório Diário de Obra | Preencha e exporte em PDF" },
-      { name: "description", content: "Formulário intuitivo de Relatório Diário de Obra com clima, equipe, atividades, fotos e exportação em PDF." },
-      { property: "og:title", content: "RDO – Relatório Diário de Obra" },
-      { property: "og:description", content: "Preencha o RDO no canteiro e exporte um PDF profissional." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
-  component: Index,
-});
 
 type Clima = "Bom" | "Nublado" | "Chuva fraca" | "Chuva forte";
 const CLIMAS: Clima[] = ["Bom", "Nublado", "Chuva fraca", "Chuva forte"];
@@ -40,7 +28,7 @@ type RDO = {
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
-const hoje = () => new Date().toISOString().slice(0, 10);
+const hoje = hojeLocal;
 const vazio = (): RDO => ({
   obra: "", cliente: "", endereco: "", contrato: "", responsavel: "",
   numero: "001", data: hoje(), inicio: "", prazo: "",
@@ -48,43 +36,36 @@ const vazio = (): RDO => ({
   pluvio: { "07:00": "", "12:00": "", "17:00": "" },
   mareHora: "", mareNivel: "",
   horario: "07:00 às 17:00",
-  maoDeObra: [
-    { id: uid(), a: "Pedreiro", b: "4", c: "Direto" },
-    { id: uid(), a: "Servente", b: "6", c: "Direto" },
-    { id: uid(), a: "Mestre de obras", b: "1", c: "Indireto" },
-  ],
+  maoDeObra: [],
   equipamentos: [{ id: uid(), a: "Betoneira 400L", b: "1" }],
   atividades: [{ id: uid(), a: "", b: "" }],
   ocorrencias: "", seguranca: "", fotos: [], assResp: "", assFiscal: "",
 });
-const somaTipo = (r: RDO, t: string) =>
-  r.maoDeObra.filter((m) => (m.c ?? "Direto") === t).reduce((s, m) => s + (Number(m.b) || 0), 0);
 const mareTxt = (r: RDO) =>
   r.mareHora || r.mareNivel ? `${r.mareHora || "--:--"} - ${(r.mareNivel || "0").replace(".", ",")} m` : "—";
-const KEY = "rdo-atual-v2";
 const fmt = (d: string) => (d ? d.split("-").reverse().join("/") : "—");
 const diaSemana = (d: string) =>
   d ? new Date(d + "T12:00").toLocaleDateString("pt-BR", { weekday: "long" }) : "";
 
-function Index() {
-  const { perfil } = Route.useRouteContext();
+export function DiaryForm({ date, rdo, maoObra, userId, numero }: { date: string; rdo: RdoBanco | null; maoObra: MaoObraBanco[]; userId: string; numero: number }) {
   const useObra = usePermissao("editar_obra");
   const exportar = usePermissao("exportar_pdf");
   const alterarData = usePermissao("alterar_numero_data");
-  const key = `${KEY}:${perfil.id}`;
+  const key = chaveLocal(date);
   const [r, setR] = useState<RDO>(vazio);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   useEffect(() => {
-    try { const s = localStorage.getItem(key); setR(s ? { ...vazio(), ...JSON.parse(s) } : vazio()); } catch { setR(vazio()); }
+    try { const s = localStorage.getItem(key); setR(s ? { ...vazio(), ...JSON.parse(s), maoDeObra: [] } : vazio()); } catch { setR(vazio()); }
     setLoadedKey(key);
   }, [key]);
   useEffect(() => {
     if (loadedKey !== key) return;
-    try { localStorage.setItem(key, JSON.stringify(r)); } catch {}
+    const { maoDeObra: _oldLabor, numero: _numero, data: _date, ...local } = r;
+    try { localStorage.setItem(key, JSON.stringify(local)); } catch {}
   }, [r, loadedKey, key]);
-
   const set = <K extends keyof RDO>(k: K, v: RDO[K]) => setR((p) => ({ ...p, [k]: v }));
-  const totalEquipe = r.maoDeObra.reduce((s, m) => s + (Number(m.b) || 0), 0);
+  const totalEquipe = totalEfetivo(maoObra);
+  const documento = { ...r, numero: String(rdo?.numero ?? numero), data: date };
 
   const addFotos = (files: FileList | null) => {
     if (!files) return;
@@ -106,14 +87,6 @@ function Index() {
     });
   };
 
-  const novoDia = () => {
-    if (!confirm("Iniciar o RDO do próximo dia? Dados da obra e equipe serão mantidos.")) return;
-    setR((p) => ({
-      ...p, numero: String((Number(p.numero) || 0) + 1).padStart(3, "0"), data: hoje(),
-      atividades: [{ id: uid(), a: "", b: "" }], ocorrencias: "", seguranca: "", fotos: [],
-    }));
-  };
-
   return (
     <>
       <div className="no-print min-h-screen pb-28">
@@ -122,12 +95,10 @@ function Index() {
           <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-4 py-5">
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-safety">Relatório Diário de Obra</p>
-              <h1 className="font-display text-3xl font-bold uppercase sm:text-4xl">RDO nº {r.numero || "—"}</h1>
-              <p className="text-sm opacity-80">{fmt(r.data)} · {diaSemana(r.data)}</p>
+              <h1 className="font-display text-3xl font-bold uppercase sm:text-4xl">RDO nº {documento.numero}</h1>
+              <p className="text-sm opacity-80">{fmt(documento.data)} · {diaSemana(documento.data)}</p>
             </div>
-            <Button disabled={!alterarData} onClick={novoDia} className="rounded-md border border-navy-foreground/30 px-3 py-2 text-sm font-medium hover:bg-navy-foreground/10">
-              + Próximo dia
-            </Button>
+
           </div>
         </header>
 
@@ -139,8 +110,6 @@ function Index() {
               <F label="Endereço" wide><input className="field" disabled={!useObra} value={r.endereco} onChange={(e) => set("endereco", e.target.value)} /></F>
               <F label="Responsável técnico"><input className="field" disabled={!useObra} value={r.responsavel} onChange={(e) => set("responsavel", e.target.value)} placeholder="Eng. Nome – CREA" /></F>
               <F label="Contrato / ART"><input className="field" disabled={!useObra} value={r.contrato} onChange={(e) => set("contrato", e.target.value)} /></F>
-              <F label="Nº do RDO"><input className="field" disabled={!alterarData} value={r.numero} onChange={(e) => set("numero", e.target.value)} /></F>
-              <F label="Data"><input type="date" className="field" disabled={!alterarData} value={r.data} onChange={(e) => set("data", e.target.value)} /></F>
               <F label="Início da obra"><input type="date" className="field" disabled={!useObra} value={r.inicio} onChange={(e) => set("inicio", e.target.value)} /></F>
               <F label="Prazo previsto"><input type="date" className="field" disabled={!useObra} value={r.prazo} onChange={(e) => set("prazo", e.target.value)} /></F>
             </div>
@@ -185,32 +154,8 @@ function Index() {
             </div>
           </Section>
 
-          <Section permissao="lancar_mao_obra" n="3" title={`Mão de obra · Efetivo ${totalEquipe}`}>
-            <div className="mb-3 grid grid-cols-3 gap-2 text-center">
-              {[["Direto", somaTipo(r, "Direto")], ["Indireto", somaTipo(r, "Indireto")], ["Efetivo total", totalEquipe]].map(([l, v], i) => (
-                <div key={l} className={`rounded-lg border px-2 py-2 ${i === 2 ? "bg-navy text-navy-foreground" : "bg-muted"}`}>
-                  <div className="text-[10px] font-semibold uppercase opacity-80">{l}</div>
-                  <div className="font-display text-2xl font-bold">{v}</div>
-                </div>
-              ))}
-            </div>
-            <div className="space-y-2">
-              <div className="flex gap-2 text-xs font-semibold uppercase text-muted-foreground"><span className="flex-1">Função</span><span className="w-28">Efetivo</span><span className="w-20">Qtd.</span><span className="w-9" /></div>
-              {r.maoDeObra.map((x) => {
-                const up = (k: "a" | "b" | "c", v: string) => set("maoDeObra", r.maoDeObra.map((y) => (y.id === x.id ? { ...y, [k]: v } : y)));
-                return (
-                  <div key={x.id} className="flex gap-2">
-                    <input className="field flex-1" value={x.a} onChange={(e) => up("a", e.target.value)} />
-                    <select className="field w-28" value={x.c ?? "Direto"} onChange={(e) => up("c", e.target.value)}>
-                      <option>Direto</option><option>Indireto</option>
-                    </select>
-                    <input className="field w-20" inputMode="numeric" placeholder="0" value={x.b} onChange={(e) => up("b", e.target.value)} />
-                    <Button onClick={() => set("maoDeObra", r.maoDeObra.filter((y) => y.id !== x.id))} className="w-9 rounded-md border text-muted-foreground hover:text-destructive" aria-label="Remover">×</Button>
-                  </div>
-                );
-              })}
-              <Button onClick={() => set("maoDeObra", [...r.maoDeObra, { id: uid(), a: "", b: "", c: "Direto" }])} className="text-sm font-semibold text-accent-foreground hover:underline">+ Adicionar função</Button>
-            </div>
+          <Section n="3" title="Mão de obra">
+            <MaoObra rdo={rdo} rows={maoObra} userId={userId} date={date} />
           </Section>
 
           <Section permissao="lancar_equipamentos" n="4" title="Equipamentos">
@@ -265,7 +210,7 @@ function Index() {
         </div>
       </div>
 
-      {exportar && <PrintView r={r} total={totalEquipe} />}
+      {exportar && <PrintView r={documento} total={totalEquipe} maoObra={maoObra} />}
     </>
   );
 }
@@ -313,7 +258,7 @@ function Rows({ rows, onChange, la, lb, pb, numeric }: { rows: Row[]; onChange: 
 function PH({ children }: { children: ReactNode }) {
   return <div className="mb-1.5 mt-4 border-l-4 border-safety bg-navy px-2 py-1 font-display text-sm font-bold uppercase text-navy-foreground">{children}</div>;
 }
-function PrintView({ r, total }: { r: RDO; total: number }) {
+function PrintView({ r, total, maoObra }: { r: RDO; total: number; maoObra: MaoObraBanco[] }) {
   const filled = (rows: Row[]) => rows.filter((x) => x.a.trim());
   return (
     <div className="print-only text-[11px] text-foreground">
@@ -368,9 +313,8 @@ function PrintView({ r, total }: { r: RDO; total: number }) {
           <table className="w-full border-collapse">
             <thead><tr className="bg-muted text-left"><th className="px-2 py-1">Função</th><th className="px-2 py-1">Efetivo</th><th className="w-12 px-2 py-1 text-right">Qtd.</th></tr></thead>
             <tbody>
-              {filled(r.maoDeObra).map((x) => <tr key={x.id} className="border-b"><td className="px-2 py-1">{x.a}</td><td className="px-2 py-1">{x.c ?? "Direto"}</td><td className="px-2 py-1 text-right font-semibold">{x.b}</td></tr>)}
-              <tr className="bg-muted"><td className="px-2 py-1 font-semibold" colSpan={2}>Direto</td><td className="px-2 py-1 text-right font-semibold">{somaTipo(r, "Direto")}</td></tr>
-              <tr className="bg-muted"><td className="px-2 py-1 font-semibold" colSpan={2}>Indireto</td><td className="px-2 py-1 text-right font-semibold">{somaTipo(r, "Indireto")}</td></tr>
+              {CATEGORIAS.flatMap(categoria => maoObra.filter(x => x.categoria === categoria).map(x => <tr key={x.id} className="border-b"><td className="px-2 py-1">{x.funcao}</td><td className="px-2 py-1">{ROTULOS[categoria]}</td><td className="px-2 py-1 text-right font-semibold">{x.quantidade}</td></tr>))}
+              {CATEGORIAS.map(categoria => <tr key={categoria} className="bg-muted"><td className="px-2 py-1 font-semibold" colSpan={2}>{ROTULOS[categoria]}</td><td className="px-2 py-1 text-right font-semibold">{totalCategoria(maoObra, categoria)}</td></tr>)}
               <tr className="bg-navy text-navy-foreground"><td className="px-2 py-1 font-bold" colSpan={2}>Efetivo total</td><td className="px-2 py-1 text-right font-bold">{total}</td></tr>
             </tbody>
           </table>
