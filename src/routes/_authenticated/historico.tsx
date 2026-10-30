@@ -17,9 +17,9 @@ export const Route = createFileRoute('/_authenticated/historico')({
     context.queryClient.ensureInfiniteQueryData(historicoQuery(context.perfil.id, deps.mes)),
   ]); },
   head: () => ({ meta: [
-    { title: 'Histórico de RDOs | Diário de Obra' },
+    { title: 'Histórico de RDOs | RDO360' },
     { name: 'description', content: 'Consulte os relatórios diários da obra por mês, número e data, com status e efetivo.' },
-    { property: 'og:title', content: 'Histórico de RDOs | Diário de Obra' },
+    { property: 'og:title', content: 'Histórico de RDOs | RDO360' },
     { property: 'og:description', content: 'Relatórios da obra, status e efetivo de cada dia.' },
     { property: 'og:type', content: 'website' }, { name: 'twitter:card', content: 'summary_large_image' },
   ] }),

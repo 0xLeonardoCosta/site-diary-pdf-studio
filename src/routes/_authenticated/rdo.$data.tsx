@@ -14,9 +14,9 @@ export const Route = createFileRoute('/_authenticated/rdo/$data')({
     context.queryClient.ensureQueryData(diaQuery(context.perfil.id, params.data)),
   ]); },
   head: ({ params }) => ({ meta: [
-    { title: `RDO ${fmtData(params.data)} | Diário de Obra` },
+    { title: `RDO ${fmtData(params.data)} | RDO360` },
     { name: 'description', content: `Relatório diário de obra de ${fmtData(params.data)}, efetivo e impressão em PDF.` },
-    { property: 'og:title', content: `RDO ${fmtData(params.data)} | Diário de Obra` },
+    { property: 'og:title', content: `RDO ${fmtData(params.data)} | RDO360` },
     { property: 'og:description', content: 'Preenchimento do dia, mão de obra e relatório para impressão.' },
     { property: 'og:type', content: 'website' }, { name: 'twitter:card', content: 'summary_large_image' },
   ] }),

@@ -16,9 +16,17 @@ export const numeroValido = (n: string) => /^-?\d+$/.test(n) && Number.isSafeInt
 export const quantidadeValida = (n: string) => /^\d+$/.test(n) && Number.isSafeInteger(Number(n)) && Number(n) >= 0;
 export const fmtData = (d: string) => d.split('-').reverse().join('/');
 export const diaSemana = (d: string) => new Date(`${d}T12:00`).toLocaleDateString('pt-BR', { weekday: 'long' });
-export const CATEGORIAS = ['direto', 'indireto', 'terceirizado'] as const;
+export const CATEGORIAS = ['indireto', 'direto', 'terceirizado'] as const;
 export type Categoria = typeof CATEGORIAS[number];
 export const ROTULOS: Record<Categoria, string> = { direto: 'Direto', indireto: 'Indireto', terceirizado: 'Terceirizado' };
+export const LOCAIS = ['Canteiro', 'Mártir Reto', 'Mártir Curvo', 'Murutucu'] as const;
+export type Local = typeof LOCAIS[number];
+export const localValido = (l: string): l is Local => (LOCAIS as readonly string[]).includes(l);
+// Stable sort: rows keep their launch order inside each location; rows without a location go last.
+export function ordenarPorLocal<T extends { local: string }>(rows: T[]) {
+  const pos = (l: string) => (localValido(l) ? LOCAIS.indexOf(l) : LOCAIS.length);
+  return [...rows].sort((a, b) => pos(a.local) - pos(b.local));
+}
 export const normalizarFuncao = (f: string) => f.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 export function totalCategoria(rows: { categoria: string; quantidade: number }[], categoria: Categoria) {
   return rows.filter(r => r.categoria === categoria).reduce((total, r) => total + r.quantidade, 0);

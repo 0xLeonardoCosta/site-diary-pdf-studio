@@ -1,7 +1,8 @@
 import { MaoObra } from "./labor";
-import { chaveLocal, hojeLocal, CATEGORIAS, ROTULOS, totalCategoria, totalEfetivo } from "@/lib/rdo/rules";
+import { chaveLocal, hojeLocal, CATEGORIAS, LOCAIS, ROTULOS, localValido, ordenarPorLocal, totalCategoria, totalEfetivo } from "@/lib/rdo/rules";
+import { MARCA } from "@/lib/marca";
 import type { MaoObraBanco, RdoBanco } from "@/lib/rdo/queries";
-import { useEffect, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { useIsMutating } from '@tanstack/react-query';
 import { usePermissao } from "@/components/auth-context";
 import { Button } from "@/components/ui/button";
@@ -10,10 +11,12 @@ import type { Permissao } from "@/lib/auth-rules";
 type Clima = "Bom" | "Nublado" | "Chuva fraca" | "Chuva forte";
 const CLIMAS: Clima[] = ["Bom", "Nublado", "Chuva fraca", "Chuva forte"];
 const CLIMA_ICON: Record<Clima, string> = { Bom: "☀️", Nublado: "☁️", "Chuva fraca": "🌦️", "Chuva forte": "⛈️" };
-const TURNOS = ["Manhã", "Tarde", "Noite"] as const;
+const TURNOS = ["Manhã", "Tarde", "Noite anterior"] as const;
+const climaIcon = (turno: string, c: Clima) => (turno === "Noite anterior" && c === "Bom" ? "🌙" : CLIMA_ICON[c]);
 const COLETAS = ["07:00", "12:00", "17:00"] as const;
 
 type Row = { id: string; a: string; b: string; c?: string };
+type Atividade = { id: string; a: string; local: string };
 type Foto = { id: string; src: string; legenda: string };
 type RDO = {
   obra: string; cliente: string; endereco: string; contrato: string; responsavel: string;
@@ -22,9 +25,9 @@ type RDO = {
   pluvio: Record<string, string>;
   mareHora: string; mareNivel: string;
   horario: string;
-  maoDeObra: Row[]; equipamentos: Row[]; atividades: Row[];
+  maoDeObra: Row[]; equipamentos: Row[]; atividades: Atividade[];
   ocorrencias: string; seguranca: string;
-  fotos: Foto[];
+  fotos: Foto[]; fotosNoPdf: boolean;
   assResp: string; assFiscal: string;
 };
 
@@ -33,15 +36,28 @@ const hoje = hojeLocal;
 const vazio = (): RDO => ({
   obra: "", cliente: "", endereco: "", contrato: "", responsavel: "",
   numero: "001", data: hoje(), inicio: "", prazo: "",
-  clima: { Manhã: "Bom", Tarde: "Bom", Noite: "Bom" },
+  clima: { Manhã: "Bom", Tarde: "Bom", "Noite anterior": "Bom" },
   pluvio: { "07:00": "", "12:00": "", "17:00": "" },
   mareHora: "", mareNivel: "",
   horario: "07:00 às 17:00",
   maoDeObra: [],
   equipamentos: [{ id: uid(), a: "Betoneira 400L", b: "1" }],
-  atividades: [{ id: uid(), a: "", b: "" }],
-  ocorrencias: "", seguranca: "", fotos: [], assResp: "", assFiscal: "",
+  atividades: [{ id: uid(), a: "", local: "" }],
+  ocorrencias: "", seguranca: "", fotos: [], fotosNoPdf: true, assResp: "", assFiscal: "",
 });
+// Older drafts used "Noite" and a "% avanço" column (b); map them to the current shape.
+const carregar = (s: string | null): RDO => {
+  const base = vazio();
+  if (!s) return base;
+  const salvo = JSON.parse(s) as Partial<RDO>;
+  const clima: Record<string, Clima> = { ...base.clima, ...salvo.clima };
+  if (clima["Noite"] && !salvo.clima?.["Noite anterior"]) clima["Noite anterior"] = clima["Noite"];
+  delete clima["Noite"];
+  const atividades = (salvo.atividades ?? base.atividades).map((x: Partial<Atividade>) => ({
+    id: x.id ?? uid(), a: x.a ?? "", local: x.local && localValido(x.local) ? x.local : "",
+  }));
+  return { ...base, ...salvo, clima, atividades, maoDeObra: [] };
+};
 const mareTxt = (r: RDO) =>
   r.mareHora || r.mareNivel ? `${r.mareHora || "--:--"} - ${(r.mareNivel || "0").replace(".", ",")} m` : "—";
 const fmt = (d: string) => (d ? d.split("-").reverse().join("/") : "—");
@@ -57,7 +73,7 @@ export function DiaryForm({ date, rdo, maoObra, userId, numero }: { date: string
   const [r, setR] = useState<RDO>(vazio);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   useEffect(() => {
-    try { const s = localStorage.getItem(key); setR(s ? { ...vazio(), ...JSON.parse(s), maoDeObra: [] } : vazio()); } catch { setR(vazio()); }
+    try { setR(carregar(localStorage.getItem(key))); } catch { setR(vazio()); }
     setLoadedKey(key);
   }, [key]);
   useEffect(() => {
@@ -96,7 +112,7 @@ export function DiaryForm({ date, rdo, maoObra, userId, numero }: { date: string
           <div className="stripes h-2" />
           <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-4 py-5">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-safety">Relatório Diário de Obra</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-safety">{MARCA} – Diário de obra{r.obra.trim() ? `: ${r.obra.trim()}` : ""}</p>
               <h1 className="font-display text-3xl font-bold uppercase sm:text-4xl">RDO nº {documento.numero}</h1>
               <p className="text-sm opacity-80">{fmt(documento.data)} · {diaSemana(documento.data)}</p>
             </div>
@@ -121,13 +137,13 @@ export function DiaryForm({ date, rdo, maoObra, userId, numero }: { date: string
             <div className="space-y-3">
               {TURNOS.map((t) => (
                 <div key={t} className="flex flex-wrap items-center gap-2">
-                  <span className="w-16 text-sm font-semibold">{t}</span>
+                  <span className="w-28 text-sm font-semibold">{t}</span>
                   {CLIMAS.map((c) => {
                     const on = r.clima[t] === c;
                     return (
                       <Button key={c} onClick={() => set("clima", { ...r.clima, [t]: c })}
                         className={`rounded-full border px-3 py-1.5 text-sm transition ${on ? "border-safety bg-safety text-safety-foreground font-semibold" : "bg-card hover:border-safety"}`}>
-                        {CLIMA_ICON[c]} {c}
+                        {climaIcon(t, c)} {c}
                       </Button>
                     );
                   })}
@@ -165,7 +181,7 @@ export function DiaryForm({ date, rdo, maoObra, userId, numero }: { date: string
           </Section>
 
           <Section permissao="lancar_atividades" n="5" title="Atividades executadas">
-            <Rows rows={r.atividades} onChange={(v) => set("atividades", v)} la="Descrição do serviço" lb="% avanço" pb="0-100" numeric />
+            <Atividades rows={r.atividades} onChange={(v) => set("atividades", v)} />
           </Section>
 
           <Section permissao="lancar_atividades" n="6" title="Ocorrências e observações">
@@ -175,7 +191,12 @@ export function DiaryForm({ date, rdo, maoObra, userId, numero }: { date: string
             </div>
           </Section>
 
-          <Section permissao="lancar_atividades" n="7" title={`Registro fotográfico · ${r.fotos.length}`}>
+          <Section permissao="lancar_atividades" n="7" title={`Registro fotográfico · ${r.fotos.length}`} extra={
+            <label className="flex cursor-pointer items-center gap-2 font-sans text-sm font-semibold normal-case text-foreground">
+              <input type="checkbox" className="size-4 accent-safety" checked={r.fotosNoPdf} onChange={(e) => set("fotosNoPdf", e.target.checked)} />
+              Incluir no PDF
+            </label>
+          }>
             <label className="flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-safety/60 bg-accent px-4 py-6 text-sm font-semibold text-accent-foreground hover:bg-accent/70">
               📷 Adicionar fotos
               <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { addFotos(e.target.files); e.target.value = ""; }} />
@@ -217,15 +238,19 @@ export function DiaryForm({ date, rdo, maoObra, userId, numero }: { date: string
   );
 }
 
-function Section({ n, title, children, permissao }: { n: string; title: string; children: ReactNode; permissao?: Permissao }) {
+function Section({ n, title, children, permissao, extra }: { n: string; title: string; children: ReactNode; permissao?: Permissao; extra?: ReactNode }) {
   const permitido = usePermissao(permissao ?? "editar_obra");
+  const bloqueado = Boolean(permissao && !permitido);
   return (
     <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-5">
-      <h2 className="mb-4 flex items-center gap-3 font-display text-xl font-bold uppercase text-primary">
-        <span className="grid h-8 w-8 place-items-center rounded bg-safety text-base text-safety-foreground">{n}</span>
-        {title}
-      </h2>
-      <fieldset disabled={Boolean(permissao && !permitido)} className="min-w-0">{children}</fieldset>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <h2 className="flex items-center gap-3 font-display text-xl font-bold uppercase text-primary">
+          <span className="grid h-8 w-8 place-items-center rounded bg-safety text-base text-safety-foreground">{n}</span>
+          {title}
+        </h2>
+        {extra && <fieldset disabled={bloqueado} className="ml-auto">{extra}</fieldset>}
+      </div>
+      <fieldset disabled={bloqueado} className="min-w-0">{children}</fieldset>
     </section>
   );
 }
@@ -256,18 +281,48 @@ function Rows({ rows, onChange, la, lb, pb, numeric }: { rows: Row[]; onChange: 
   );
 }
 
+function Atividades({ rows, onChange }: { rows: Atividade[]; onChange: (r: Atividade[]) => void }) {
+  const up = (id: string, k: "a" | "local", v: string) => {
+    const novas = rows.map((x) => (x.id === id ? { ...x, [k]: v } : x));
+    onChange(k === "local" ? ordenarPorLocal(novas) : novas);
+  };
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2 text-xs font-semibold uppercase text-muted-foreground"><span className="flex-1">Descrição do serviço</span><span className="w-36">Local</span><span className="w-9" /></div>
+      {rows.map((x) => (
+        <div key={x.id} className="flex gap-2">
+          <input aria-label="Descrição do serviço" className="field min-w-0 flex-1" value={x.a} onChange={(e) => up(x.id, "a", e.target.value)} />
+          <select aria-label="Local do serviço" className="field w-36" value={x.local} onChange={(e) => up(x.id, "local", e.target.value)}>
+            <option value="">Selecione…</option>
+            {LOCAIS.map((l) => <option key={l} value={l}>{l}</option>)}
+          </select>
+          <Button onClick={() => onChange(rows.filter((y) => y.id !== x.id))} className="w-9 rounded-md border text-muted-foreground hover:text-destructive" aria-label="Remover">×</Button>
+        </div>
+      ))}
+      <Button onClick={() => onChange([...rows, { id: uid(), a: "", local: "" }])} className="text-sm font-semibold text-accent-foreground hover:underline">+ Adicionar linha</Button>
+    </div>
+  );
+}
+
 /* ---------- PDF / impressão ---------- */
-function PH({ children }: { children: ReactNode }) {
-  return <div className="mb-1.5 mt-4 border-l-4 border-safety bg-navy px-2 py-1 font-display text-sm font-bold uppercase text-navy-foreground">{children}</div>;
+function PH({ n, children }: { n: number; children: ReactNode }) {
+  return <div className="mb-1 mt-3 break-after-avoid border-l-4 border-safety bg-navy px-2 py-0.5 font-display text-sm font-bold uppercase text-navy-foreground">{n}. {children}</div>;
+}
+// Compact "name … qty" entries meant to flow across columns, so long lists fill the page width instead of one tall table.
+function PLista({ itens }: { itens: { id: string; nome: string; qtd: ReactNode }[] }) {
+  return <>{itens.map((x) => <div key={x.id} className="flex break-inside-avoid justify-between gap-2 border-b border-dotted px-1 py-px"><span className="min-w-0">{x.nome}</span><b>{x.qtd}</b></div>)}</>;
 }
 function PrintView({ r, total, maoObra }: { r: RDO; total: number; maoObra: MaoObraBanco[] }) {
-  const filled = (rows: Row[]) => rows.filter((x) => x.a.trim());
+  const equipamentos = r.equipamentos.filter((x) => x.a.trim());
+  const atividades = ordenarPorLocal(r.atividades.filter((x) => x.a.trim()));
+  const ocorrencias = r.ocorrencias.trim(), seguranca = r.seguranca.trim();
+  const fotos = r.fotosNoPdf ? r.fotos : [];
   return (
     <div className="print-only text-[11px] text-foreground">
       <div className="stripes h-2" />
-      <div className="flex items-end justify-between bg-navy px-4 py-3 text-navy-foreground">
+      <div className="flex items-end justify-between bg-navy px-4 py-2.5 text-navy-foreground">
         <div>
-          <div className="text-[9px] font-semibold uppercase tracking-widest text-safety">Relatório Diário de Obra</div>
+          <div className="text-[9px] font-semibold uppercase tracking-widest text-safety">{MARCA} – Diário de obra:</div>
           <div className="font-display text-2xl font-bold uppercase">{r.obra || "Obra"}</div>
         </div>
         <div className="text-right">
@@ -276,87 +331,84 @@ function PrintView({ r, total, maoObra }: { r: RDO; total: number; maoObra: MaoO
         </div>
       </div>
 
-      <table className="mt-2 w-full border-collapse">
+      <PH n={1}>Dados da obra</PH>
+      <table className="w-full border-collapse">
         <tbody>
           {[["Cliente", r.cliente, "Contrato / ART", r.contrato], ["Endereço", r.endereco, "Resp. técnico", r.responsavel], ["Início", fmt(r.inicio), "Prazo previsto", fmt(r.prazo)]].map((l, i) => (
             <tr key={i} className="border-b">
-              <td className="w-24 bg-muted px-2 py-1 font-semibold">{l[0]}</td><td className="px-2 py-1">{l[1] || "—"}</td>
-              <td className="w-28 bg-muted px-2 py-1 font-semibold">{l[2]}</td><td className="px-2 py-1">{l[3] || "—"}</td>
+              <td className="w-24 bg-muted px-2 py-0.5 font-semibold">{l[0]}</td><td className="px-2 py-0.5">{l[1] || "—"}</td>
+              <td className="w-28 bg-muted px-2 py-0.5 font-semibold">{l[2]}</td><td className="px-2 py-0.5">{l[3] || "—"}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <PH>Condições climáticas · Horário: {r.horario}</PH>
-      <div className="grid grid-cols-3 gap-2">
+      <PH n={2}>Condições climáticas · Horário: {r.horario}</PH>
+      <div className="grid grid-cols-7 gap-1.5">
         {TURNOS.map((t) => (
-          <div key={t} className="rounded border px-2 py-1.5 text-center">
-            <div className="text-[9px] uppercase text-muted-foreground">{t}</div>
-            <div className="font-semibold">{CLIMA_ICON[r.clima[t] ?? "Bom"]} {r.clima[t] ?? "Bom"}</div>
+          <div key={t} className="rounded border px-1 py-1 text-center">
+            <div className="text-[8px] uppercase text-muted-foreground">{t}</div>
+            <div className="font-semibold">{climaIcon(t, r.clima[t] ?? "Bom")} {r.clima[t] ?? "Bom"}</div>
           </div>
         ))}
-      </div>
-      <div className="mt-2 grid grid-cols-4 gap-2">
         {COLETAS.map((h) => (
-          <div key={h} className="rounded border px-2 py-1.5 text-center">
-            <div className="text-[9px] uppercase text-muted-foreground">Pluviômetro {h}</div>
+          <div key={h} className="rounded border px-1 py-1 text-center">
+            <div className="text-[8px] uppercase text-muted-foreground">Pluviôm. {h}</div>
             <div className="font-semibold">{r.pluvio?.[h] ? `${r.pluvio?.[h]} mm` : "—"}</div>
           </div>
         ))}
-        <div className="rounded border border-safety px-2 py-1.5 text-center">
-          <div className="text-[9px] uppercase text-muted-foreground">Maré máxima</div>
+        <div className="rounded border border-safety px-1 py-1 text-center">
+          <div className="text-[8px] uppercase text-muted-foreground">Maré máxima</div>
           <div className="font-semibold">{mareTxt(r)}</div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="avoid-break">
-          <PH>Mão de obra · Efetivo {total}</PH>
-          <table className="w-full border-collapse">
-            <thead><tr className="bg-muted text-left"><th className="px-2 py-1">Função</th><th className="px-2 py-1">Efetivo</th><th className="w-12 px-2 py-1 text-right">Qtd.</th></tr></thead>
-            <tbody>
-              {CATEGORIAS.flatMap(categoria => maoObra.filter(x => x.categoria === categoria).map(x => <tr key={x.id} className="border-b"><td className="px-2 py-1">{x.funcao}</td><td className="px-2 py-1">{ROTULOS[categoria]}</td><td className="px-2 py-1 text-right font-semibold">{x.quantidade}</td></tr>))}
-              {CATEGORIAS.map(categoria => <tr key={categoria} className="bg-muted"><td className="px-2 py-1 font-semibold" colSpan={2}>{ROTULOS[categoria]}</td><td className="px-2 py-1 text-right font-semibold">{totalCategoria(maoObra, categoria)}</td></tr>)}
-              <tr className="bg-navy text-navy-foreground"><td className="px-2 py-1 font-bold" colSpan={2}>Efetivo total</td><td className="px-2 py-1 text-right font-bold">{total}</td></tr>
-            </tbody>
-          </table>
+      <PH n={3}>Mão de obra · {CATEGORIAS.map((c) => `${ROTULOS[c]} ${totalCategoria(maoObra, c)}`).join(" · ")} · Efetivo total {total}</PH>
+      {maoObra.length ? (
+        <div className="columns-3 gap-4">
+          {CATEGORIAS.map((c) => {
+            const linhas = maoObra.filter((x) => x.categoria === c);
+            if (!linhas.length) return null;
+            return (
+              <Fragment key={c}>
+                <div className="mt-1 flex break-inside-avoid break-after-avoid justify-between bg-muted px-1 py-px font-bold uppercase first:mt-0"><span>{ROTULOS[c]}</span><span>{totalCategoria(maoObra, c)}</span></div>
+                <PLista itens={linhas.map((x) => ({ id: x.id, nome: x.funcao, qtd: x.quantidade }))} />
+              </Fragment>
+            );
+          })}
         </div>
-        <div className="avoid-break">
-          <PH>Equipamentos</PH>
-          <PTable rows={filled(r.equipamentos)} ha="Equipamento" hb="Qtd." />
-        </div>
-      </div>
+      ) : <p className="px-1 text-muted-foreground">Nenhum efetivo registrado.</p>}
 
-      <div className="avoid-break">
-        <PH>Atividades executadas</PH>
+      <PH n={4}>Equipamentos</PH>
+      {equipamentos.length
+        ? <div className="columns-3 gap-4"><PLista itens={equipamentos.map((x) => ({ id: x.id, nome: x.a, qtd: x.b }))} /></div>
+        : <p className="px-1 text-muted-foreground">Nenhum equipamento registrado.</p>}
+
+      <PH n={5}>Atividades executadas</PH>
+      {atividades.length ? (
         <table className="w-full border-collapse">
-          <thead><tr className="bg-muted text-left"><th className="px-2 py-1">Descrição</th><th className="w-40 px-2 py-1">Avanço</th></tr></thead>
+          <thead><tr className="bg-muted text-left"><th className="w-28 px-2 py-0.5">Local</th><th className="px-2 py-0.5">Descrição do serviço</th></tr></thead>
           <tbody>
-            {filled(r.atividades).map((x) => {
-              const p = Math.max(0, Math.min(100, Number(x.b) || 0));
-              return (
-                <tr key={x.id} className="border-b">
-                  <td className="px-2 py-1">{x.a}</td>
-                  <td className="px-2 py-1"><div className="flex items-center gap-2"><div className="h-2 flex-1 rounded bg-muted"><div className="h-2 rounded bg-safety" style={{ width: `${p}%` }} /></div><span className="w-8 text-right font-semibold">{p}%</span></div></td>
-                </tr>
-              );
-            })}
-            {!filled(r.atividades).length && <tr><td className="px-2 py-1 text-muted-foreground" colSpan={2}>Nenhuma atividade registrada.</td></tr>}
+            {atividades.map((x, i) => (
+              <tr key={x.id} className="break-inside-avoid border-b">
+                <td className="px-2 py-0.5 align-top font-semibold">{i === 0 || atividades[i - 1]?.local !== x.local ? x.local || "Sem local" : ""}</td>
+                <td className="px-2 py-0.5">{x.a}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
-      </div>
+      ) : <p className="px-1 text-muted-foreground">Nenhuma atividade registrada.</p>}
 
-      <div className="avoid-break">
-        <PH>Ocorrências e observações</PH>
-        <p className="min-h-8 whitespace-pre-wrap rounded border px-2 py-1.5">{r.ocorrencias || "Sem ocorrências."}</p>
-        {r.seguranca && (<><div className="mt-2 font-semibold">Segurança do trabalho</div><p className="whitespace-pre-wrap rounded border px-2 py-1.5">{r.seguranca}</p></>)}
-      </div>
+      <PH n={6}>Ocorrências e observações</PH>
+      {!ocorrencias && !seguranca && <p className="px-1 text-muted-foreground">Sem ocorrências ou observações.</p>}
+      {ocorrencias && (<><div className="font-semibold">Ocorrências / observações gerais</div><p className="whitespace-pre-wrap rounded border px-2 py-1">{ocorrencias}</p></>)}
+      {seguranca && (<><div className="mt-1.5 font-semibold">Segurança do trabalho</div><p className="whitespace-pre-wrap rounded border px-2 py-1">{seguranca}</p></>)}
 
-      {r.fotos.length > 0 && (
+      {fotos.length > 0 && (
         <>
-          <PH>Registro fotográfico</PH>
+          <PH n={7}>Registro fotográfico</PH>
           <div className="grid grid-cols-3 gap-2">
-            {r.fotos.map((f, i) => (
+            {fotos.map((f, i) => (
               <figure key={f.id} className="avoid-break overflow-hidden rounded border">
                 <img src={f.src} alt={f.legenda} className="aspect-[4/3] w-full object-cover" />
                 <figcaption className="px-1.5 py-1 text-[9px]"><b>Foto {i + 1}.</b> {f.legenda}</figcaption>
@@ -366,23 +418,15 @@ function PrintView({ r, total, maoObra }: { r: RDO; total: number; maoObra: MaoO
         </>
       )}
 
-      <div className="avoid-break mt-12 grid grid-cols-2 gap-10 text-center">
-        {[["Responsável pela obra", r.assResp], ["Fiscalização / Cliente", r.assFiscal]].map(([l, n]) => (
-          <div key={l}><div className="border-t border-foreground pt-1 font-semibold">{n || " "}</div><div className="text-[9px] uppercase text-muted-foreground">{l}</div></div>
-        ))}
+      <div className="avoid-break">
+        <PH n={fotos.length > 0 ? 8 : 7}>Assinaturas</PH>
+        <div className="mt-10 grid grid-cols-2 gap-10 text-center">
+          {[["Responsável pela obra", r.assResp], ["Fiscalização / Cliente", r.assFiscal]].map(([l, n]) => (
+            <div key={l}><div className="border-t border-foreground pt-1 font-semibold">{n || " "}</div><div className="text-[9px] uppercase text-muted-foreground">{l}</div></div>
+          ))}
+        </div>
       </div>
-      <div className="stripes mt-6 h-1.5" />
+      <div className="stripes mt-4 h-1.5" />
     </div>
-  );
-}
-function PTable({ rows, ha, hb }: { rows: Row[]; ha: string; hb: string }) {
-  return (
-    <table className="w-full border-collapse">
-      <thead><tr className="bg-muted text-left"><th className="px-2 py-1">{ha}</th><th className="w-12 px-2 py-1 text-right">{hb}</th></tr></thead>
-      <tbody>
-        {rows.map((x) => <tr key={x.id} className="border-b"><td className="px-2 py-1">{x.a}</td><td className="px-2 py-1 text-right font-semibold">{x.b}</td></tr>)}
-        {!rows.length && <tr><td colSpan={2} className="px-2 py-1 text-muted-foreground">—</td></tr>}
-      </tbody>
-    </table>
   );
 }

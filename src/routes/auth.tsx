@@ -9,10 +9,10 @@ import { useAuth } from '@/components/auth-context';
 
 export const Route = createFileRoute('/auth')({
   head: () => ({ meta: [
-    { title: 'Entrar | Diário de Obra' },
-    { name: 'description', content: 'Acesso da equipe ao Relatório Diário de Obra.' },
-    { property: 'og:title', content: 'Entrar | Diário de Obra' },
-    { property: 'og:description', content: 'Acesso da equipe ao Relatório Diário de Obra.' },
+    { title: 'Entrar | RDO360' },
+    { name: 'description', content: 'Acesso da equipe ao RDO360 – Diário de obra.' },
+    { property: 'og:title', content: 'Entrar | RDO360' },
+    { property: 'og:description', content: 'Acesso da equipe ao RDO360 – Diário de obra.' },
     { property: 'og:type', content: 'website' }, { name: 'twitter:card', content: 'summary_large_image' },
   ] }),
   component: Login,
@@ -41,8 +41,8 @@ function Login() {
     <div className="stripes h-2" />
     <div className="mx-auto max-w-md px-6 py-20">
       <HardHat className="mb-6 size-12 text-accent-foreground" />
-      <p className="mb-2 text-sm font-semibold uppercase text-muted-foreground">Relatório diário</p>
-      <h1 className="mb-10 font-display text-4xl font-bold uppercase">Diário de Obra</h1>
+      <p className="mb-2 text-sm font-semibold uppercase text-muted-foreground">Diário de obra</p>
+      <h1 className="mb-10 font-display text-4xl font-bold">RDO360</h1>
       <form onSubmit={entrar} className="space-y-5">
         <label className="block text-sm font-semibold">Nome<input className="field mt-2" autoComplete="username" value={nome} onChange={e => setNome(e.target.value)} required /></label>
         <label className="block text-sm font-semibold">Senha<input className="field mt-2" type="password" autoComplete="current-password" value={senha} onChange={e => setSenha(e.target.value)} required /></label>

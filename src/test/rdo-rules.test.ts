@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { numeroParaData, dataParaNumero, somaDias, hojeLocal, dataValida, numeroValido, quantidadeValida, normalizarFuncao, totalCategoria, totalEfetivo, podeEditarMaoObra, chaveLocal, CATEGORIAS } from '@/lib/rdo/rules';
+import { numeroParaData, dataParaNumero, somaDias, hojeLocal, dataValida, numeroValido, quantidadeValida, normalizarFuncao, totalCategoria, totalEfetivo, podeEditarMaoObra, chaveLocal, CATEGORIAS, LOCAIS, localValido, ordenarPorLocal } from '@/lib/rdo/rules';
 
 describe('Número e data ligados', () => {
   it.each([[1000, '2026-10-25'], [1002, '2026-10-27'], [1007, '2026-11-01']] as const)('converte referência %i nos dois sentidos', (numero, data) => {
@@ -31,7 +31,7 @@ describe('Número e data ligados', () => {
   });
 });
 describe('Mão de obra', () => {
-  it('usa as três categorias minúsculas na ordem exigida', () => { expect(CATEGORIAS).toEqual(['direto', 'indireto', 'terceirizado']); });
+  it('usa as três categorias minúsculas na ordem exigida', () => { expect(CATEGORIAS).toEqual(['indireto', 'direto', 'terceirizado']); });
   it('aceita quantidade inteira maior ou igual a zero', () => {
     expect(quantidadeValida('0')).toBe(true);
     expect(quantidadeValida('12')).toBe(true);
@@ -50,5 +50,16 @@ describe('Mão de obra', () => {
     expect(podeEditarMaoObra(true, 'fechado', false)).toBe(false);
     expect(podeEditarMaoObra(true, 'fechado', true)).toBe(true);
     expect(podeEditarMaoObra(true, 'aberto', false)).toBe(true);
+  });
+});
+describe('Atividades por local', () => {
+  it('ordena pelos locais da obra mantendo a ordem de lançamento', () => {
+    const rows = [{ id: 'a', local: 'Murutucu' }, { id: 'b', local: '' }, { id: 'c', local: 'Canteiro' }, { id: 'd', local: 'Mártir Curvo' }, { id: 'e', local: 'Canteiro' }, { id: 'f', local: 'Mártir Reto' }];
+    expect(ordenarPorLocal(rows).map(r => r.id)).toEqual(['c', 'e', 'f', 'd', 'a', 'b']);
+  });
+  it('reconhece só os quatro locais', () => {
+    expect(LOCAIS).toEqual(['Canteiro', 'Mártir Reto', 'Mártir Curvo', 'Murutucu']);
+    expect(localValido('Canteiro')).toBe(true);
+    expect(localValido('50')).toBe(false);
   });
 });

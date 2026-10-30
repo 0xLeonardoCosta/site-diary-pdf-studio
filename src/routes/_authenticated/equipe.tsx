@@ -27,9 +27,9 @@ export const Route = createFileRoute('/_authenticated/equipe')({
     await context.queryClient.ensureQueryData(equipeQuery);
   },
   head: () => ({ meta: [
-    { title: 'Equipe | Diário de Obra' },
+    { title: 'Equipe | RDO360' },
     { name: 'description', content: 'Administração dos usuários e permissões da equipe da obra.' },
-    { property: 'og:title', content: 'Equipe | Diário de Obra' },
+    { property: 'og:title', content: 'Equipe | RDO360' },
     { property: 'og:description', content: 'Administração dos usuários e permissões da equipe da obra.' },
     { property: 'og:type', content: 'website' }, { name: 'twitter:card', content: 'summary_large_image' },
   ] }),
