@@ -2,6 +2,7 @@ import { MaoObra } from "./labor";
 import { chaveLocal, hojeLocal, CATEGORIAS, ROTULOS, totalCategoria, totalEfetivo } from "@/lib/rdo/rules";
 import type { MaoObraBanco, RdoBanco } from "@/lib/rdo/queries";
 import { useEffect, useState, type ReactNode } from "react";
+import { useIsMutating } from '@tanstack/react-query';
 import { usePermissao } from "@/components/auth-context";
 import { Button } from "@/components/ui/button";
 import type { Permissao } from "@/lib/auth-rules";
@@ -51,6 +52,7 @@ export function DiaryForm({ date, rdo, maoObra, userId, numero }: { date: string
   const useObra = usePermissao("editar_obra");
   const exportar = usePermissao("exportar_pdf");
   const alterarData = usePermissao("alterar_numero_data");
+  const salvandoMaoObra = useIsMutating({ mutationKey: ['rdo-labor', userId, date] }) > 0;
   const key = chaveLocal(date);
   const [r, setR] = useState<RDO>(vazio);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
@@ -203,7 +205,7 @@ export function DiaryForm({ date, rdo, maoObra, userId, numero }: { date: string
         <div className="fixed inset-x-0 bottom-0 border-t bg-card/95 backdrop-blur">
           <div className="mx-auto flex max-w-4xl gap-3 px-4 py-3">
             <Button disabled={!useObra || !alterarData} onClick={() => confirm("Limpar todo o formulário?") && setR(vazio())} className="rounded-md border px-4 py-3 text-sm font-medium">Limpar</Button>
-            <Button disabled={!exportar} onClick={() => window.print()} className="flex-1 rounded-md bg-safety px-4 py-3 font-display text-lg font-bold uppercase text-safety-foreground shadow-lg hover:brightness-105">
+            <Button disabled={!exportar || salvandoMaoObra} onClick={() => window.print()} className="flex-1 rounded-md bg-safety px-4 py-3 font-display text-lg font-bold uppercase text-safety-foreground shadow-lg hover:brightness-105">
               Exportar PDF
             </Button>
           </div>
