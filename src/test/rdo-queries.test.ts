@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { QueryClient } from '@tanstack/react-query';
 const mock = vi.hoisted(() => {
   const calls: { method: string; args: unknown[] }[] = [];
   const results: unknown[] = [];
@@ -36,7 +37,7 @@ describe('Contrato com o banco existente', () => {
     // Invoke the query function with the same context used by Query's pagination.
     const fn = options.queryFn;
     if (typeof fn !== 'function') throw new Error('Missing query function');
-    const result = await fn({ pageParam: 0, queryKey: options.queryKey, signal: new AbortController().signal, direction: 'forward', meta: undefined, client: undefined } as Parameters<typeof fn>[0]);
+    const result = await fn({ pageParam: 0, queryKey: options.queryKey, signal: new AbortController().signal, direction: 'forward', meta: undefined, client: new QueryClient() });
     expect(TAMANHO_PAGINA).toBe(30);
     expect(mock.calls.find(c => c.method === 'range')?.args).toEqual([0, 29]);
     expect(mock.calls.find(c => c.method === 'order')?.args).toEqual(['data', { ascending: false }]);
