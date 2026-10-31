@@ -509,6 +509,8 @@ export type Database = {
           data: string
           fechado_em: string | null
           fechado_por: string | null
+          fotos_no_pdf: boolean
+          horario_trabalho: string | null
           id: string
           mare_max_hora: string | null
           mare_max_nivel: number | null
@@ -531,6 +533,8 @@ export type Database = {
           data: string
           fechado_em?: string | null
           fechado_por?: string | null
+          fotos_no_pdf?: boolean
+          horario_trabalho?: string | null
           id?: string
           mare_max_hora?: string | null
           mare_max_nivel?: number | null
@@ -553,6 +557,8 @@ export type Database = {
           data?: string
           fechado_em?: string | null
           fechado_por?: string | null
+          fotos_no_pdf?: boolean
+          horario_trabalho?: string | null
           id?: string
           mare_max_hora?: string | null
           mare_max_nivel?: number | null

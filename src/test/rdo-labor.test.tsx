@@ -5,13 +5,13 @@ const mocks = vi.hoisted(() => ({ result: { data: null as unknown, error: null a
 vi.mock('@/components/auth-context', () => ({ usePermissao: () => true }));
 vi.mock('sonner', () => ({ toast: { error: mocks.error } }));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { from: () => {
-  const chain = { eq: () => chain, select: () => chain, single: () => Promise.resolve(mocks.result) };
+  const chain = { eq: () => chain, is: () => chain, select: () => chain, single: () => Promise.resolve(mocks.result), maybeSingle: () => Promise.resolve(mocks.result) };
   return { update: (values: unknown) => { mocks.update(values); return chain; }, insert: (values: unknown) => { mocks.insert(values); return chain; } };
 } } }));
 import { MaoObra } from '@/components/rdo/labor';
-import { diaQuery, type MaoObraBanco } from '@/lib/rdo/queries';
+import { diaQuery, type MaoObraBanco, type RdoBanco } from '@/lib/rdo/queries';
 import { useSuspenseQuery } from '@tanstack/react-query';
-const rdo = { id: 'rdo', data: '2026-10-27', numero: 1002, status: 'aberto' };
+const rdo = { id: 'rdo', data: '2026-10-27', numero: 1002, status: 'aberto' } as RdoBanco;
 const row: MaoObraBanco = { id: 'linha', rdo_id: 'rdo', funcao: 'Pedreiro', categoria: 'direto', quantidade: 4, copiado: false, copiado_por: null, created_by: 'autor', created_at: '2026-10-27', updated_by: null, updated_at: null };
 function Teste() {
   const { data } = useSuspenseQuery(diaQuery('usuario', rdo.data));
@@ -19,7 +19,7 @@ function Teste() {
 }
 function montar() {
   const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
-  client.setQueryData(diaQuery('usuario', rdo.data).queryKey, { rdo, maoObra: [row] });
+  client.setQueryData(diaQuery('usuario', rdo.data).queryKey, { rdo, maoObra: [row], equipamentos: [], atividades: [], anotacoes: [], fotos: [] });
   render(<QueryClientProvider client={client}><Teste /></QueryClientProvider>);
   return client;
 }

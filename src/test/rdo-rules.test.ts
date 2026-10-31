@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { numeroParaData, dataParaNumero, somaDias, hojeLocal, dataValida, numeroValido, quantidadeValida, normalizarFuncao, totalCategoria, totalEfetivo, podeEditarMaoObra, chaveLocal, CATEGORIAS, LOCAIS, localValido, ordenarPorLocal } from '@/lib/rdo/rules';
+import { numeroParaData, dataParaNumero, somaDias, hojeLocal, dataValida, numeroValido, quantidadeValida, normalizarFuncao, totalCategoria, totalEfetivo, podeEditarMaoObra, chaveLocal, CATEGORIAS, climaIcone, numeroParaTexto, ordenarPorFrente, podeEditarLinha, rdoEditavel, textoParaNumero } from '@/lib/rdo/rules';
 
 describe('Número e data ligados', () => {
   it.each([[1000, '2026-10-25'], [1002, '2026-10-27'], [1007, '2026-11-01']] as const)('converte referência %i nos dois sentidos', (numero, data) => {
@@ -52,14 +52,34 @@ describe('Mão de obra', () => {
     expect(podeEditarMaoObra(true, 'aberto', false)).toBe(true);
   });
 });
-describe('Atividades por local', () => {
-  it('ordena pelos locais da obra mantendo a ordem de lançamento', () => {
-    const rows = [{ id: 'a', local: 'Murutucu' }, { id: 'b', local: '' }, { id: 'c', local: 'Canteiro' }, { id: 'd', local: 'Mártir Curvo' }, { id: 'e', local: 'Canteiro' }, { id: 'f', local: 'Mártir Reto' }];
-    expect(ordenarPorLocal(rows).map(r => r.id)).toEqual(['c', 'e', 'f', 'd', 'a', 'b']);
+describe('Atividades por frente', () => {
+  it('ordena pela ordem das frentes mantendo a ordem de lançamento', () => {
+    const frentes = [{ id: 'canteiro', ordem: 1 }, { id: 'reto', ordem: 2 }, { id: 'murutucu', ordem: 4 }];
+    const rows = [{ id: 'a', frente_id: 'murutucu' }, { id: 'b', frente_id: 'canteiro' }, { id: 'c', frente_id: 'reto' }, { id: 'd', frente_id: 'canteiro' }];
+    expect(ordenarPorFrente(rows, frentes).map(r => r.id)).toEqual(['b', 'd', 'c', 'a']);
   });
-  it('reconhece só os quatro locais', () => {
-    expect(LOCAIS).toEqual(['Canteiro', 'Mártir Reto', 'Mártir Curvo', 'Murutucu']);
-    expect(localValido('Canteiro')).toBe(true);
-    expect(localValido('50')).toBe(false);
+});
+describe('Campos e permissões do RDO', () => {
+  it('usa a lua só no tempo bom da noite anterior', () => {
+    expect(climaIcone('Noite anterior', 'Bom')).toBe('🌙');
+    expect(climaIcone('Manhã', 'Bom')).toBe('☀️');
+    expect(climaIcone('Noite anterior', 'Chuva forte')).toBe('⛈️');
+  });
+  it('converte número com vírgula e recusa texto', () => {
+    expect(textoParaNumero('2,85')).toBe(2.85);
+    expect(textoParaNumero('  ')).toBeNull();
+    expect(() => textoParaNumero('abc')).toThrow();
+    expect(numeroParaTexto(2.85)).toBe('2,85');
+    expect(numeroParaTexto(null)).toBe('');
+  });
+  it('só o autor ou quem edita de outros altera a linha', () => {
+    expect(podeEditarLinha('eu', 'eu', false)).toBe(true);
+    expect(podeEditarLinha('outro', 'eu', false)).toBe(false);
+    expect(podeEditarLinha('outro', 'eu', true)).toBe(true);
+  });
+  it('RDO fechado só fica editável para quem pode reabrir', () => {
+    expect(rdoEditavel('aberto', false)).toBe(true);
+    expect(rdoEditavel('fechado', false)).toBe(false);
+    expect(rdoEditavel('fechado', true)).toBe(true);
   });
 });

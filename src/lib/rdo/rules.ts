@@ -19,13 +19,33 @@ export const diaSemana = (d: string) => new Date(`${d}T12:00`).toLocaleDateStrin
 export const CATEGORIAS = ['indireto', 'direto', 'terceirizado'] as const;
 export type Categoria = typeof CATEGORIAS[number];
 export const ROTULOS: Record<Categoria, string> = { direto: 'Direto', indireto: 'Indireto', terceirizado: 'Terceirizado' };
-export const LOCAIS = ['Canteiro', 'Mártir Reto', 'Mártir Curvo', 'Murutucu'] as const;
-export type Local = typeof LOCAIS[number];
-export const localValido = (l: string): l is Local => (LOCAIS as readonly string[]).includes(l);
-// Stable sort: rows keep their launch order inside each location; rows without a location go last.
-export function ordenarPorLocal<T extends { local: string }>(rows: T[]) {
-  const pos = (l: string) => (localValido(l) ? LOCAIS.indexOf(l) : LOCAIS.length);
-  return [...rows].sort((a, b) => pos(a.local) - pos(b.local));
+export const CLIMAS = ['Bom', 'Nublado', 'Chuva fraca', 'Chuva forte'] as const;
+export const TURNOS = [
+  { rotulo: 'Manhã', coluna: 'clima_manha' },
+  { rotulo: 'Tarde', coluna: 'clima_tarde' },
+  { rotulo: 'Noite anterior', coluna: 'clima_noite' },
+] as const;
+export const COLETAS = [
+  { hora: '07:00', coluna: 'pluv_07h' },
+  { hora: '12:00', coluna: 'pluv_12h' },
+  { hora: '17:00', coluna: 'pluv_17h' },
+] as const;
+const CLIMA_ICONE: Record<string, string> = { Bom: '☀️', Nublado: '☁️', 'Chuva fraca': '🌦️', 'Chuva forte': '⛈️' };
+export const climaIcone = (turno: string, clima: string) => (turno === 'Noite anterior' && clima === 'Bom' ? '🌙' : CLIMA_ICONE[clima] ?? '');
+// Stable sort: activities keep their launch order inside each work front.
+export function ordenarPorFrente<T extends { frente_id: string }>(rows: T[], frentes: { id: string; ordem: number }[]) {
+  const pos = (id: string) => frentes.find(f => f.id === id)?.ordem ?? Number.MAX_SAFE_INTEGER;
+  return [...rows].sort((a, b) => pos(a.frente_id) - pos(b.frente_id));
+}
+export const rdoEditavel = (status: string | undefined, fechar: boolean) => status !== 'fechado' || fechar;
+export const podeEditarLinha = (criadoPor: string, userId: string, editarDeOutros: boolean) => criadoPor === userId || editarDeOutros;
+export const numeroParaTexto = (n: number | null) => (n === null ? '' : String(n).replace('.', ','));
+export function textoParaNumero(texto: string) {
+  const limpo = texto.trim().replace(',', '.');
+  if (!limpo) return null;
+  const n = Number(limpo);
+  if (!Number.isFinite(n)) throw new Error('Informe um número válido, como 2,85.');
+  return n;
 }
 export const normalizarFuncao = (f: string) => f.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 export function totalCategoria(rows: { categoria: string; quantidade: number }[], categoria: Categoria) {
