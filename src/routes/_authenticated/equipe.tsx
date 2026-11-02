@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PERMISSOES, permissoesVazias, senhaValida, type Perfil, type Permissao, type Permissoes } from '@/lib/auth-rules';
 import { carregarPerfil } from '@/lib/auth-session';
 import { useAuth } from '@/components/auth-context';
+import { AssinaturaUsuario } from '@/components/rdo/assinatura-perfil';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -48,7 +49,7 @@ function EquipeAdmin() {
   const { refresh } = useAuth();
   const [editor, setEditor] = useState<Editor | null>(null);
   const [busy, setBusy] = useState(false);
-  async function executar(body: Record<string, unknown>) {
+  async function executar(body: Record<string, unknown>, depois?: () => Promise<void>) {
     setBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke('admin-users', { body });
@@ -62,6 +63,7 @@ function EquipeAdmin() {
       }
       if (data?.erro) throw new Error(data.erro);
       if (data?.ok !== true) throw new Error('Não foi possível concluir a ação.');
+      await depois?.();
       toast.success('Alteração realizada.');
       setEditor(null);
       await queryClient.invalidateQueries({ queryKey: ['equipe'] });
@@ -80,6 +82,7 @@ function EquipeAdmin() {
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" disabled={busy} onClick={() => setEditor({ tipo: 'permissoes', usuario })}><UserRoundCog />Permissões</Button>
           <Button variant="outline" disabled={busy} onClick={() => setEditor({ tipo: 'senha', usuario })}><KeyRound />Redefinir senha</Button>
+          <AssinaturaUsuario usuario={usuario} />
           <label className="flex items-center gap-2 px-2 text-sm"><Switch disabled={busy} checked={usuario.ativo} aria-label={`Conta ativa de ${usuario.nome}`} onCheckedChange={ativo => void executar({ acao: 'ativar_desativar', id: usuario.id, ativo })} />Ativo</label>
         </div>
       </article>)}
@@ -93,22 +96,30 @@ function EquipeAdmin() {
     </Dialog>
   </main>;
 }
-function EditorUsuario({ editor, busy, executar }: { editor: Editor; busy: boolean; executar: (body: Record<string, unknown>) => Promise<void> }) {
+function EditorUsuario({ editor, busy, executar }: { editor: Editor; busy: boolean; executar: (body: Record<string, unknown>, depois?: () => Promise<void>) => Promise<void> }) {
   const [nome, setNome] = useState('');
   const [senha, setSenha] = useState('');
   const [permissoes, setPermissoes] = useState<Permissoes>(() => editor.tipo === 'permissoes' ? Object.fromEntries(Object.keys(PERMISSOES).map(key => [key, editor.usuario[key as Permissao]])) as Permissoes : permissoesVazias());
   function salvar(event: FormEvent) {
     event.preventDefault();
     if (editor.tipo !== 'permissoes' && !senhaValida(senha)) { toast.error('A senha deve ter no mínimo 8 caracteres.'); return; }
-    if (editor.tipo === 'criar') { void executar({ acao: 'criar', nome: nome.trim(), senha, permissoes }); }
+    // The admin-users function predates this permission, so it is written directly under the admin-only rule.
+    const { alterar_assinados, ...daFuncao } = permissoes;
+    if (editor.tipo === 'criar') { void executar({ acao: 'criar', nome: nome.trim(), senha, permissoes: daFuncao }); }
     else if (editor.tipo === 'senha') { void executar({ acao: 'redefinir_senha', id: editor.usuario.id, senha }); }
-    else { void executar({ acao: 'atualizar_permissoes', id: editor.usuario.id, permissoes }); }
+    else {
+      const id = editor.usuario.id;
+      void executar({ acao: 'atualizar_permissoes', id, permissoes: daFuncao }, async () => {
+        const { error } = await supabase.from('profiles').update({ alterar_assinados }).eq('id', id).select('id').single();
+        if (error) throw error;
+      });
+    }
   }
   return <form className="space-y-5" onSubmit={salvar}>
     {editor.tipo !== 'criar' && <p className="font-semibold">{editor.usuario.nome}</p>}
     {editor.tipo === 'criar' && <label className="block text-sm font-semibold">Nome completo<input className="field mt-2" required value={nome} onChange={e => setNome(e.target.value)} /></label>}
     {editor.tipo !== 'permissoes' && <label className="block text-sm font-semibold">Senha (mínimo 8 caracteres)<input className="field mt-2" type="password" autoComplete="new-password" required minLength={8} value={senha} onChange={e => setSenha(e.target.value)} /></label>}
-    {editor.tipo !== 'senha' && <div className="divide-y">{Object.entries(PERMISSOES).map(([key, label]) => <label key={key} className="flex items-center justify-between gap-4 py-3 text-sm"><span>{label}</span><Switch aria-label={label} checked={permissoes[key as Permissao]} onCheckedChange={checked => setPermissoes(p => ({ ...p, [key]: checked }))} /></label>)}</div>}
+    {editor.tipo !== 'senha' && <div className="divide-y">{Object.entries(PERMISSOES).filter(([key]) => editor.tipo !== 'criar' || key !== 'alterar_assinados').map(([key, label]) => <label key={key} className="flex items-center justify-between gap-4 py-3 text-sm"><span>{label}</span><Switch aria-label={label} checked={permissoes[key as Permissao]} onCheckedChange={checked => setPermissoes(p => ({ ...p, [key]: checked }))} /></label>)}</div>}
     <Button disabled={busy} type="submit" className="w-full">{busy ? 'Salvando…' : 'Salvar'}</Button>
   </form>;
 }

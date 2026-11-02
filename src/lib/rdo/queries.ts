@@ -2,7 +2,7 @@ import { queryOptions, infiniteQueryOptions, type QueryClient } from '@tanstack/
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 import { somaDias } from './rules';
-import { BUCKET_FOTOS } from './salvar';
+import { BUCKET_ASSINATURAS, BUCKET_FOTOS, BUCKET_LOGOS } from './salvar';
 
 export type RdoBanco = Tables<'rdos'>;
 export type MaoObraBanco = Tables<'mao_obra'>;
@@ -80,6 +80,26 @@ export const fotosUrlsQuery = (userId: string, caminhos: string[]) => queryOptio
     return Object.fromEntries(data.flatMap(item => (item.path && item.signedUrl ? [[item.path, item.signedUrl]] : []))) as Record<string, string>;
   },
 });
+export const logoUrlQuery = (userId: string, caminho: string | null) => queryOptions({
+  queryKey: ['rdo', userId, 'fotos-url', 'logo', caminho],
+  enabled: Boolean(caminho),
+  staleTime: 30 * 60000,
+  queryFn: async () => {
+    const { data, error } = await supabase.storage.from(BUCKET_LOGOS).createSignedUrl(caminho ?? '', 3600);
+    if (error) throw error;
+    return data.signedUrl;
+  },
+});
+export const assinaturaUrlQuery = (userId: string, caminho: string | null) => queryOptions({
+  queryKey: ['rdo', userId, 'fotos-url', 'assinatura', caminho],
+  enabled: Boolean(caminho),
+  staleTime: 30 * 60000,
+  queryFn: async () => {
+    const { data, error } = await supabase.storage.from(BUCKET_ASSINATURAS).createSignedUrl(caminho ?? '', 3600);
+    if (error) throw error;
+    return data.signedUrl;
+  },
+});
 export function alterarDia(client: QueryClient, userId: string, date: string, alterar: (dia: DiaRdo) => DiaRdo) {
   client.setQueryData(diaQuery(userId, date).queryKey, old => (old ? alterar(old) : old));
 }
@@ -87,14 +107,44 @@ export function alterarDia(client: QueryClient, userId: string, date: string, al
 export const comLinha = <T extends { id: string }>(linhas: T[], linha: T) =>
   (linhas.some(x => x.id === linha.id) ? linhas.map(x => (x.id === linha.id ? linha : x)) : [...linhas, linha]);
 
+export const sugestoesQuery = (userId: string, frente: string, busca: string) => queryOptions({
+  queryKey: ['rdo', userId, 'sugestoes', frente, busca],
+  enabled: Boolean(frente),
+  // Keeps the list steady between keystrokes, but never shows another front's suggestions.
+  placeholderData: (anterior, consulta) => (consulta?.queryKey[3] === frente ? anterior : undefined),
+  staleTime: 30000,
+  queryFn: async () => {
+    const { data, error } = await supabase.rpc('sugestoes_atividades', { p_frente: frente, p_busca: busca, p_limite: 8 });
+    if (error) throw error;
+    return data;
+  },
+});
+const limitesMes = (mes: string) => {
+  const inicio = `${mes}-01`;
+  return { inicio, fim: somaDias(inicio, 32).slice(0, 7) + '-01' };
+};
+// Every RDO the filter matches, not only the loaded pages, so "select all" means the whole filter.
+export const filtroQuery = (userId: string, mes: string) => queryOptions({
+  queryKey: ['rdo', userId, 'filtro', mes],
+  queryFn: async () => {
+    const rows: { id: string; data: string }[] = [];
+    for (let start = 0; ; start += 1000) {
+      let query = supabase.from('rdos').select('id, data').order('data');
+      if (mes) { const { inicio, fim } = limitesMes(mes); query = query.gte('data', inicio).lt('data', fim); }
+      const { data, error } = await query.range(start, start + 999);
+      if (error) throw error;
+      rows.push(...data);
+      if (data.length < 1000) return rows;
+    }
+  },
+});
 export const TAMANHO_PAGINA = 30;
 export const historicoQuery = (userId: string, mes: string) => infiniteQueryOptions({
   queryKey: ['rdo', userId, 'historico', mes], initialPageParam: 0,
   queryFn: async ({ pageParam }) => {
-    let query = supabase.from('rdos').select('id, data, numero, status').order('data', { ascending: false });
+    let query = supabase.from('rdos').select('id, data, numero, status, assinado_nome').order('data', { ascending: false });
     if (mes) {
-      const inicio = `${mes}-01`;
-      const fim = somaDias(inicio, 32).slice(0, 7) + '-01';
+      const { inicio, fim } = limitesMes(mes);
       query = query.gte('data', inicio).lt('data', fim);
     }
     const { data, error } = await query.range(pageParam, pageParam + TAMANHO_PAGINA - 1);

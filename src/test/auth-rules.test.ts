@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { nomeParaEmail, pode, permissoesVazias, senhaValida, PERMISSOES, type Perfil } from '@/lib/auth-rules';
 
 const perfil = (overrides: Partial<Perfil> = {}): Perfil => ({
-  id: 'usuario', nome: 'Eng Leo', role: 'preenchedor', ativo: true,
+  id: 'usuario', nome: 'Eng Leo', role: 'preenchedor', ativo: true, assinatura_path: null,
   criado_em: '2026-10-28', ...permissoesVazias(), ...overrides,
 });
 describe('Regras de acesso existentes', () => {

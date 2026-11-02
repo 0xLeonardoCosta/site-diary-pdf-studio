@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useAuth, usePermissao } from '@/components/auth-context';
 import { Button } from '@/components/ui/button';
 import { useCampo } from '@/hooks/use-campo';
+import { DescricaoComSugestoes } from './sugestoes';
 import { alterarDia, comLinha, type AnotacaoBanco, type AtividadeBanco, type EquipamentoBanco, type FotoBanco, type FrenteBanco } from '@/lib/rdo/queries';
 import { mensagemErro, ordenarPorFrente, podeEditarLinha, quantidadeValida } from '@/lib/rdo/rules';
 import { enviarFoto, excluirFoto, excluirLinha, inserirLinha, salvarLinha } from '@/lib/rdo/salvar';
@@ -105,7 +106,7 @@ export function Atividades({ linhas, frentes, ctx }: { linhas: AtividadeBanco[];
       <div className="flex gap-2 text-xs font-semibold uppercase text-muted-foreground"><span className="flex-1">Descrição do serviço</span><span className="w-36">Local</span><span className="w-9" /></div>
       {ordenarPorFrente(linhas, frentes).map(x => <LinhaAtividade key={x.id} linha={x} frentes={frentes} ctx={ctx} />)}
       <div className="flex gap-2">
-        <input aria-label="Nova atividade" className="field min-w-0 flex-1" placeholder="Nova atividade" value={descricao} onChange={e => setDescricao(e.target.value)} />
+        <DescricaoComSugestoes userId={ctx.userId} frente={frente} valor={descricao} alterar={setDescricao} enviar={adicionar} />
         <SelectFrente rotulo="Local da nova atividade" frentes={frentes} valor={frente} alterar={setFrente} />
         <span className="w-9 shrink-0" />
       </div>

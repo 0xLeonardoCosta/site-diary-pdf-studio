@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { usePermissao } from '@/components/auth-context';
 import { useReferencia } from './reference';
+import { FecharRdo } from './fechar-rdo';
 import { criarRdo, moverRdo, type RdoBanco } from '@/lib/rdo/queries';
 import { dataParaNumero, dataValida, fmtData, hojeLocal, mensagemErro, numeroParaData, numeroValido, somaDias } from '@/lib/rdo/rules';
 
@@ -13,7 +14,8 @@ export function DayControls({ date, rdo, userId }: { date: string; rdo: RdoBanco
   const ref = useReferencia();
   const [data, setData] = useState(date);
   const [numero, setNumero] = useState(String(rdo?.numero ?? dataParaNumero(date, ref.ref_numero, ref.ref_data)));
-  const alterar = usePermissao('alterar_numero_data');
+  const alterarAssinados = usePermissao('alterar_assinados');
+  const alterar = usePermissao('alterar_numero_data') && (!rdo?.assinado_em || alterarAssinados);
   const navigate = useNavigate();
   const client = useQueryClient();
   const ir = (day: string) => { if (dataValida(day)) void navigate({ to: '/rdo/$data', params: { data: day } }); };
@@ -58,6 +60,6 @@ export function DayControls({ date, rdo, userId }: { date: string; rdo: RdoBanco
       <label className="text-sm font-semibold">Data<input aria-label="Data" className="field mt-1" type="date" value={data} disabled={mutation.isPending || Boolean(rdo && !alterar)} onChange={e => editarData(e.target.value)} /></label>
       {rdo && alterar && data !== date && <Button disabled={mutation.isPending} onClick={confirmar}>Confirmar mudança</Button>}
     </div>
-    {!rdo ? <div className="flex flex-wrap items-center gap-3"><p className="text-sm text-muted-foreground">Este dia ainda não tem RDO</p><Button disabled={mutation.isPending} onClick={confirmar}>{mutation.isPending ? 'Criando…' : `Criar RDO nº ${numero} — ${dataValida(data) ? fmtData(data) : '—'}`}</Button></div> : <p className="text-sm font-semibold">{rdo.status === 'fechado' ? 'Fechado' : 'Aberto'}</p>}
+    {!rdo ? <div className="flex flex-wrap items-center gap-3"><p className="text-sm text-muted-foreground">Este dia ainda não tem RDO</p><Button disabled={mutation.isPending} onClick={confirmar}>{mutation.isPending ? 'Criando…' : `Criar RDO nº ${numero} — ${dataValida(data) ? fmtData(data) : '—'}`}</Button></div> : <div className="flex flex-wrap items-center gap-3"><p className="text-sm font-semibold">{rdo.status === 'fechado' ? 'Fechado' : 'Aberto'}</p>{(!rdo.assinado_em || alterarAssinados) && <FecharRdo rdo={rdo} userId={userId} />}</div>}
   </div></div>;
 }

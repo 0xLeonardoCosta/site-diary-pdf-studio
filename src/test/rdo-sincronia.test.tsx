@@ -12,6 +12,7 @@ const mock = vi.hoisted(() => {
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { from: () => mock.chain } }));
 vi.mock('sonner', () => ({ toast: { error: mock.erro } }));
 import { useCampo } from '@/hooks/use-campo';
+import { posicaoAssinatura, removerFundo } from '@/lib/rdo/assinatura';
 import { lerRascunho } from '@/lib/rdo/rascunho';
 import { ConflitoEdicao, SemPermissao, salvarCampo, salvarLinha } from '@/lib/rdo/salvar';
 
@@ -91,5 +92,27 @@ describe('Rascunhos antigos', () => {
     expect(lerRascunho(JSON.stringify({ ocorrencias: 'Chuva parou a obra' }))).not.toBeNull();
     expect(lerRascunho(JSON.stringify({ clima: { Manhã: 'Chuva forte' } }))).not.toBeNull();
     expect(lerRascunho(JSON.stringify({ equipamentos: [{ a: 'Escavadeira', b: '2' }] }))).not.toBeNull();
+  });
+});
+
+describe('Preparo da assinatura', () => {
+  const imagem = (linhas: number[][]) => Uint8ClampedArray.from(linhas.flat().flatMap(b => [b, b, b, 255]));
+  it('deixa o papel transparente, mantém a tinta e recorta as margens', () => {
+    const px = imagem([[235, 235, 235, 235], [235, 20, 30, 235], [235, 235, 235, 235]]);
+    expect(removerFundo(px, 4, 3)).toEqual({ x: 1, y: 1, largura: 2, altura: 1 });
+    expect(px[3]).toBe(0);
+    expect(px[(1 * 4 + 1) * 4 + 3]).toBe(255);
+    // The colour itself is untouched, so blue ink stays blue.
+    expect(px[(1 * 4 + 1) * 4]).toBe(20);
+  });
+  it('funciona em digitalização cinza e avisa se não há tinta', () => {
+    const cinza = imagem([[170, 170, 170], [170, 40, 170], [170, 170, 170]]);
+    expect(removerFundo(cinza, 3, 3)).toEqual({ x: 1, y: 1, largura: 1, altura: 1 });
+    expect(removerFundo(imagem([[250, 250], [250, 250]]), 2, 2)).toBeNull();
+  });
+  it('varia a posição entre RDOs e repete a mesma em cada exportação', () => {
+    expect(posicaoAssinatura(976)).toEqual(posicaoAssinatura(976));
+    expect(posicaoAssinatura(976)).not.toEqual(posicaoAssinatura(977));
+    expect(Math.abs(posicaoAssinatura(980).angulo)).toBeLessThanOrEqual(1.8);
   });
 });

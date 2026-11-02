@@ -37,7 +37,8 @@ export function ordenarPorFrente<T extends { frente_id: string }>(rows: T[], fre
   const pos = (id: string) => frentes.find(f => f.id === id)?.ordem ?? Number.MAX_SAFE_INTEGER;
   return [...rows].sort((a, b) => pos(a.frente_id) - pos(b.frente_id));
 }
-export const rdoEditavel = (status: string | undefined, fechar: boolean) => status !== 'fechado' || fechar;
+// A signed RDO answers only to its own permission, whatever its open/closed status.
+export const rdoEditavel = (status: string | undefined, fechar: boolean, assinado = false, alterarAssinados = false) => (assinado ? alterarAssinados : status !== 'fechado' || fechar);
 export const podeEditarLinha = (criadoPor: string, userId: string, editarDeOutros: boolean) => criadoPor === userId || editarDeOutros;
 export const numeroParaTexto = (n: number | null) => (n === null ? '' : String(n).replace('.', ','));
 export function textoParaNumero(texto: string) {
@@ -52,7 +53,7 @@ export function totalCategoria(rows: { categoria: string; quantidade: number }[]
   return rows.filter(r => r.categoria === categoria).reduce((total, r) => total + r.quantidade, 0);
 }
 export const totalEfetivo = (rows: { quantidade: number }[]) => rows.reduce((total, r) => total + r.quantidade, 0);
-export const podeEditarMaoObra = (lancar: boolean, status: string | undefined, fechar: boolean) => lancar && (status !== 'fechado' || fechar);
+export const podeEditarMaoObra = (lancar: boolean, status: string | undefined, fechar: boolean, assinado = false, alterarAssinados = false) => lancar && rdoEditavel(status, fechar, assinado, alterarAssinados);
 export const chaveLocal = (data: string) => `rdo-local-${data}`;
 export function mensagemErro(error: unknown) {
   if (error && typeof error === 'object' && 'message' in error) return String(error.message);

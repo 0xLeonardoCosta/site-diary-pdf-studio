@@ -2,14 +2,15 @@ import { useEffect, type ReactNode } from "react";
 import { useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { MaoObra } from "./labor";
 import { Anotacoes, Atividades, Equipamentos, Fotos } from "./lancamentos";
+import { AssinarRdo } from "./assinar-rdo";
 import { ImportarRascunho } from "./importar-rascunho";
-import { PrintView, imprimir } from "./print-view";
+import { LogoObra, PrintView, imprimir } from "./print-view";
 import { usePermissao } from "@/components/auth-context";
 import { Button } from "@/components/ui/button";
 import { useCampo } from "@/hooks/use-campo";
 import type { Permissao } from "@/lib/auth-rules";
 import { MARCA } from "@/lib/marca";
-import { alterarDia, fotosUrlsQuery, frentesQuery, obraQuery, type DiaRdo, type FrenteBanco, type ObraBanco, type RdoBanco } from "@/lib/rdo/queries";
+import { alterarDia, assinaturaUrlQuery, fotosUrlsQuery, frentesQuery, logoUrlQuery, obraQuery, type DiaRdo, type FrenteBanco, type RdoBanco } from "@/lib/rdo/queries";
 import { CLIMAS, COLETAS, TURNOS, climaIcone, diaSemana, fmtData, numeroParaTexto, rdoEditavel, textoParaNumero } from "@/lib/rdo/rules";
 import { salvarCampo } from "@/lib/rdo/salvar";
 import { useSincronia, type EstadoSincronia } from "@/lib/rdo/sincronia";
@@ -20,9 +21,11 @@ export function DiaryForm({ date, dia, userId, numero }: { date: string; dia: Di
   const { data: obra } = useSuspenseQuery(obraQuery(userId));
   const { data: frentes } = useSuspenseQuery(frentesQuery(userId));
   const urls = useQuery(fotosUrlsQuery(userId, dia.fotos.map((f) => f.storage_path))).data ?? {};
+  const logoUrl = useQuery(logoUrlQuery(userId, obra.logo_path)).data ?? null;
   const exportar = usePermissao("exportar_pdf");
   const sincronia = useSincronia();
   const { rdo } = dia;
+  const assinaturaUrl = useQuery(assinaturaUrlQuery(userId, rdo?.assinatura_path ?? null)).data ?? null;
 
   // Closing the tab would drop whatever is still debouncing.
   useEffect(() => {
@@ -37,8 +40,9 @@ export function DiaryForm({ date, dia, userId, numero }: { date: string; dia: Di
       <div className="no-print min-h-screen pb-28">
         <header className="bg-navy text-navy-foreground">
           <div className="stripes h-2" />
-          <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-4 py-5">
-            <div>
+          <div className="mx-auto flex max-w-4xl items-center gap-4 px-4 py-5">
+            {logoUrl && <LogoObra url={logoUrl} />}
+            <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-widest text-safety">{MARCA} – Diário de obra: {obra.nome}</p>
               <h1 className="font-display text-3xl font-bold uppercase sm:text-4xl">RDO nº {rdo?.numero ?? numero}</h1>
               <p className="text-sm opacity-80">{fmtData(date)} · {diaSemana(date)}</p>
@@ -48,9 +52,8 @@ export function DiaryForm({ date, dia, userId, numero }: { date: string; dia: Di
 
         <main className="mx-auto max-w-4xl space-y-5 px-4 py-6">
           {rdo && <ImportarRascunho key={rdo.id} date={date} rdo={rdo} obra={obra} frentes={frentes} />}
-          <DadosObra obra={obra} userId={userId} />
           {rdo
-            ? <SecoesDoDia key={rdo.id} rdo={rdo} dia={dia} date={date} userId={userId} frentes={frentes} urls={urls} />
+            ? <SecoesDoDia key={rdo.id} rdo={rdo} dia={dia} date={date} userId={userId} frentes={frentes} urls={urls} assinaturaUrl={assinaturaUrl} />
             : <p className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">Crie o RDO deste dia, no topo da página, para começar o preenchimento.</p>}
         </main>
 
@@ -64,46 +67,16 @@ export function DiaryForm({ date, dia, userId, numero }: { date: string; dia: Di
         </div>
       </div>
 
-      {exportar && rdo && <PrintView doc={{ ...dia, rdo, obra, frentes, urls }} />}
+      {exportar && rdo && <PrintView doc={{ ...dia, rdo, obra, frentes, urls, logoUrl, assinaturaUrl }} />}
     </>
   );
 }
 
-function DadosObra({ obra, userId }: { obra: ObraBanco; userId: string }) {
-  const props = { obra, userId };
-  return (
-    <Section permissao="editar_obra" n="1" title="Dados da obra">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <F label="Obra"><CampoObra {...props} campo="nome" placeholder="Ex.: Residencial Bela Vista" /></F>
-        <F label="Cliente / Contratante"><CampoObra {...props} campo="cliente" /></F>
-        <F label="Endereço" wide><CampoObra {...props} campo="endereco" /></F>
-        <F label="Responsável técnico"><CampoObra {...props} campo="responsavel_tecnico" placeholder="Eng. Nome – CREA" /></F>
-        <F label="Contrato / ART"><CampoObra {...props} campo="contrato" /></F>
-        <F label="Início da obra"><CampoObra {...props} campo="data_inicio" tipo="date" /></F>
-        <F label="Prazo previsto"><CampoObra {...props} campo="prazo_previsto" tipo="date" /></F>
-      </div>
-    </Section>
-  );
-}
-type ColunaObra = "nome" | "cliente" | "endereco" | "responsavel_tecnico" | "contrato" | "data_inicio" | "prazo_previsto";
-function CampoObra({ obra, userId, campo, tipo = "text", placeholder }: { obra: ObraBanco; userId: string; campo: ColunaObra; tipo?: string; placeholder?: string }) {
-  const client = useQueryClient();
-  const c = useCampo(obra[campo] ?? "", async (novo, base) => {
-    const texto = novo.trim();
-    // "nome" is the only required column.
-    if (campo === "nome" && !texto) throw new Error("Informe o nome da obra.");
-    await salvarCampo("obra", true, campo, base || null, texto || null);
-    client.setQueryData(obraQuery(userId).queryKey, (old) => (old ? { ...old, [campo]: texto || null } : old));
-    return texto;
-  // A partially typed date is not a value to save yet.
-  }, { atraso: tipo === "date" ? null : 700, pronto: (v) => campo !== "nome" || Boolean(v.trim()) });
-  return <input type={tipo} className="field" placeholder={placeholder} value={c.valor} onChange={(e) => c.alterar(e.target.value)} onBlur={() => void c.confirmar()} />;
-}
-
-type PropsDia = { rdo: RdoBanco; dia: DiaRdo; date: string; userId: string; frentes: FrenteBanco[]; urls: Record<string, string> };
-function SecoesDoDia({ rdo, dia, date, userId, frentes, urls }: PropsDia) {
+type PropsDia = { rdo: RdoBanco; dia: DiaRdo; date: string; userId: string; frentes: FrenteBanco[]; urls: Record<string, string>; assinaturaUrl: string | null };
+function SecoesDoDia({ rdo, dia, date, userId, frentes, urls, assinaturaUrl }: PropsDia) {
   const fechar = usePermissao("fechar_reabrir");
-  const travado = !rdoEditavel(rdo.status, fechar);
+  const alterarAssinados = usePermissao("alterar_assinados");
+  const travado = !rdoEditavel(rdo.status, fechar, Boolean(rdo.assinado_em), alterarAssinados);
   const ctx = { rdoId: rdo.id, userId, date };
   const campo = { rdo, userId, date };
   return (
@@ -113,7 +86,7 @@ function SecoesDoDia({ rdo, dia, date, userId, frentes, urls }: PropsDia) {
           {TURNOS.map((t) => <TurnoClima key={t.coluna} turno={t} {...campo} />)}
           <F label="Horário de trabalho"><CampoRdo {...campo} coluna="horario_trabalho" className="field max-w-xs" /></F>
           <div>
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pluviômetro (mm)</span>
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pluviômetro - Precipitação (mm)</span>
             <div className="grid grid-cols-3 gap-2">
               {COLETAS.map((c) => (
                 <label key={c.hora} className="block">
@@ -156,10 +129,10 @@ function SecoesDoDia({ rdo, dia, date, userId, frentes, urls }: PropsDia) {
         <Fotos linhas={dia.fotos} urls={urls} ctx={ctx} />
       </Section>
 
-      <Section permissao="fechar_reabrir" travado={travado} n="8" title="Assinaturas">
+      <Section permissao="fechar_reabrir" travado={travado} n="8" title="Assinaturas" rodape={<AssinarRdo rdo={rdo} userId={userId} url={assinaturaUrl} />}>
         <div className="grid gap-3 sm:grid-cols-2">
-          <F label="Responsável pela obra"><CampoRdo {...campo} coluna="assinante_obra" /></F>
-          <F label="Fiscalização / Cliente"><CampoRdo {...campo} coluna="assinante_fiscalizacao" /></F>
+          <F label="Contratada"><CampoRdo {...campo} coluna="assinante_obra" /></F>
+          <F label="Gerenciadora"><CampoRdo {...campo} coluna="assinante_fiscalizacao" /></F>
         </div>
       </Section>
     </>
@@ -228,7 +201,7 @@ function FotosNoPdf(campo: PropsCampo) {
   );
 }
 
-function Section({ n, title, children, permissao, extra, travado }: { n: string; title: string; children: ReactNode; permissao?: Permissao; extra?: ReactNode; travado?: boolean }) {
+function Section({ n, title, children, permissao, extra, travado, rodape }: { n: string; title: string; children: ReactNode; permissao?: Permissao; extra?: ReactNode; travado?: boolean; rodape?: ReactNode }) {
   const permitido = usePermissao(permissao ?? "editar_obra");
   const bloqueado = Boolean((permissao && !permitido) || travado);
   return (
@@ -241,6 +214,7 @@ function Section({ n, title, children, permissao, extra, travado }: { n: string;
         {extra && <fieldset disabled={bloqueado} className="ml-auto">{extra}</fieldset>}
       </div>
       <fieldset disabled={bloqueado} className="min-w-0">{children}</fieldset>
+      {rodape}
     </section>
   );
 }

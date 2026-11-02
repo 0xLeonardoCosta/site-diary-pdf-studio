@@ -11,6 +11,8 @@ export class SemPermissao extends Error {
 type Valor = string | number | boolean | null;
 export type TabelaLinha = 'mao_obra' | 'equipamentos' | 'atividades' | 'anotacoes' | 'fotos';
 export const BUCKET_FOTOS = 'rdo-fotos';
+export const BUCKET_LOGOS = 'obra-logos';
+export const BUCKET_ASSINATURAS = 'assinaturas';
 
 // Compare-and-set per field: edits to different fields never collide, and a stale edit to the same field is refused.
 // An update hidden by RLS also returns no row, so the current value tells a conflict apart from a denial.
@@ -65,4 +67,44 @@ export async function excluirFoto(foto: Pick<Tables<'fotos'>, 'id' | 'storage_pa
   const remocao = await supabase.storage.from(BUCKET_FOTOS).remove([foto.storage_path]);
   if (remocao.error) throw remocao.error;
   await excluirLinha('fotos', foto.id);
+}
+
+// Signing happens only through these database functions, which check the signer and copy their name and image.
+export async function assinarRdo(rdoId: string) {
+  const { error } = await supabase.rpc('assinar_rdo', { p_rdo: rdoId });
+  if (error) throw error;
+}
+export async function removerAssinaturaRdo(rdoId: string) {
+  const { error } = await supabase.rpc('remover_assinatura_rdo', { p_rdo: rdoId });
+  if (error) throw error;
+}
+
+const LOTE = 100;
+const emLotes = <T,>(lista: T[]) => Array.from({ length: Math.ceil(lista.length / LOTE) }, (_, i) => lista.slice(i * LOTE, (i + 1) * LOTE));
+export type ResumoExclusao = { rdos: { id: string; numero: number; data: string; assinado_nome: string | null }[]; caminhos: string[] };
+// In batches: a long id list would not fit in one request's URL.
+export async function resumoExclusao(ids: string[]): Promise<ResumoExclusao> {
+  const resumo: ResumoExclusao = { rdos: [], caminhos: [] };
+  for (const lote of emLotes(ids)) {
+    const [rdos, fotos] = await Promise.all([
+      supabase.from('rdos').select('id, numero, data, assinado_nome').in('id', lote),
+      supabase.from('fotos').select('storage_path').in('rdo_id', lote),
+    ]);
+    if (rdos.error) throw rdos.error;
+    if (fotos.error) throw fotos.error;
+    resumo.rdos.push(...rdos.data);
+    resumo.caminhos.push(...fotos.data.map(f => f.storage_path));
+  }
+  resumo.rdos.sort((a, b) => a.data.localeCompare(b.data));
+  return resumo;
+}
+// Files first: the storage policy looks up the photo row, which the database function removes.
+export async function excluirRdos(ids: string[], caminhos: string[]) {
+  for (const lote of emLotes(caminhos)) {
+    const remocao = await supabase.storage.from(BUCKET_FOTOS).remove(lote);
+    if (remocao.error) throw remocao.error;
+  }
+  const { data, error } = await supabase.rpc('excluir_rdos', { p_ids: ids });
+  if (error) throw error;
+  return data;
 }

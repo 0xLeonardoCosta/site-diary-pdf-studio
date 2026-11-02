@@ -15,7 +15,8 @@ export function MaoObra({ rdo, rows, userId, date }: { rdo: RdoBanco | null; row
   const lancar = usePermissao('lancar_mao_obra');
   const fechar = usePermissao('fechar_reabrir');
   const editarDeOutros = usePermissao('editar_de_outros');
-  const editavel = Boolean(rdo) && podeEditarMaoObra(lancar, rdo?.status, fechar);
+  const alterarAssinados = usePermissao('alterar_assinados');
+  const editavel = Boolean(rdo) && podeEditarMaoObra(lancar, rdo?.status, fechar, Boolean(rdo?.assinado_em), alterarAssinados);
   const [novas, setNovas] = useState<Linha[]>([]);
   const client = useQueryClient();
   const key = diaQuery(userId, date).queryKey;

@@ -17,6 +17,7 @@ export const PERMISSOES = {
   editar_de_outros: 'Editar/excluir lançamento de outra pessoa',
   fechar_reabrir: 'Fechar e reabrir RDO (e assinaturas)',
   alterar_numero_data: 'Alterar número/data do RDO',
+  alterar_assinados: "Alterar RDO's assinados",
   exportar_pdf: 'Exportar PDF',
 } as const;
 export type Permissao = keyof typeof PERMISSOES;

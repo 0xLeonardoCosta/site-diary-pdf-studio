@@ -82,4 +82,11 @@ describe('Campos e permissões do RDO', () => {
     expect(rdoEditavel('fechado', false)).toBe(false);
     expect(rdoEditavel('fechado', true)).toBe(true);
   });
+  it('RDO assinado só muda com a permissão própria, mesmo aberto ou com fechar/reabrir', () => {
+    expect(rdoEditavel('aberto', false, true, false)).toBe(false);
+    expect(rdoEditavel('fechado', true, true, false)).toBe(false);
+    expect(rdoEditavel('fechado', false, true, true)).toBe(true);
+    expect(podeEditarMaoObra(true, 'aberto', false, true, false)).toBe(false);
+    expect(podeEditarMaoObra(false, 'aberto', false, true, true)).toBe(false);
+  });
 });

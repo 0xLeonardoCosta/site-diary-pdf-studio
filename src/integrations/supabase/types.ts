@@ -394,7 +394,10 @@ export type Database = {
           contrato: string | null
           data_inicio: string | null
           endereco: string | null
+          fiscalizacao: string | null
+          gerenciadora: string | null
           id: boolean
+          logo_path: string | null
           nome: string
           prazo_previsto: string | null
           ref_data: string
@@ -409,7 +412,10 @@ export type Database = {
           contrato?: string | null
           data_inicio?: string | null
           endereco?: string | null
+          fiscalizacao?: string | null
+          gerenciadora?: string | null
           id?: boolean
+          logo_path?: string | null
           nome?: string
           prazo_previsto?: string | null
           ref_data?: string
@@ -424,7 +430,10 @@ export type Database = {
           contrato?: string | null
           data_inicio?: string | null
           endereco?: string | null
+          fiscalizacao?: string | null
+          gerenciadora?: string | null
           id?: boolean
+          logo_path?: string | null
           nome?: string
           prazo_previsto?: string | null
           ref_data?: string
@@ -443,7 +452,9 @@ export type Database = {
       }
       profiles: {
         Row: {
+          alterar_assinados: boolean
           alterar_numero_data: boolean
+          assinatura_path: string | null
           ativo: boolean
           criado_em: string
           editar_de_outros: boolean
@@ -460,7 +471,9 @@ export type Database = {
           ver_todos_rdos: boolean
         }
         Insert: {
+          alterar_assinados?: boolean
           alterar_numero_data?: boolean
+          assinatura_path?: string | null
           ativo?: boolean
           criado_em?: string
           editar_de_outros?: boolean
@@ -477,7 +490,9 @@ export type Database = {
           ver_todos_rdos?: boolean
         }
         Update: {
+          alterar_assinados?: boolean
           alterar_numero_data?: boolean
+          assinatura_path?: string | null
           ativo?: boolean
           criado_em?: string
           editar_de_outros?: boolean
@@ -497,8 +512,12 @@ export type Database = {
       }
       rdos: {
         Row: {
+          assinado_em: string | null
+          assinado_nome: string | null
+          assinado_por: string | null
           assinante_fiscalizacao: string | null
           assinante_obra: string | null
+          assinatura_path: string | null
           clima_atualizado_em: string | null
           clima_atualizado_por: string | null
           clima_manha: string | null
@@ -521,8 +540,12 @@ export type Database = {
           status: string
         }
         Insert: {
+          assinado_em?: string | null
+          assinado_nome?: string | null
+          assinado_por?: string | null
           assinante_fiscalizacao?: string | null
           assinante_obra?: string | null
+          assinatura_path?: string | null
           clima_atualizado_em?: string | null
           clima_atualizado_por?: string | null
           clima_manha?: string | null
@@ -545,8 +568,12 @@ export type Database = {
           status?: string
         }
         Update: {
+          assinado_em?: string | null
+          assinado_nome?: string | null
+          assinado_por?: string | null
           assinante_fiscalizacao?: string | null
           assinante_obra?: string | null
+          assinatura_path?: string | null
           clima_atualizado_em?: string | null
           clima_atualizado_por?: string | null
           clima_manha?: string | null
@@ -597,6 +624,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assinar_rdo: { Args: { p_rdo: string }; Returns: undefined }
+      excluir_rdos: { Args: { p_ids: string[] }; Returns: number }
+      remover_assinatura_rdo: { Args: { p_rdo: string }; Returns: undefined }
       can_see_rdo: { Args: { p_rdo: string }; Returns: boolean }
       copiar_dia_anterior: { Args: { p_rdo: string }; Returns: Json }
       has_perm: { Args: { p: string }; Returns: boolean }

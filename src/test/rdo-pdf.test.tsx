@@ -10,12 +10,54 @@ const atividade = (id: string, frente_id: string, descricao: string) => ({ id, f
 const anotacao = (tipo: string, texto: string) => ({ id: texto, tipo, texto }) as AnotacaoBanco;
 const linha = (id: string, funcao: string, categoria: string, quantidade: number) => ({ id, funcao, categoria, quantidade }) as MaoObraBanco;
 function montar(extra: Partial<DocumentoRdo> = {}) {
-  const doc: DocumentoRdo = { rdo, obra: { nome: 'Ponte Sul' } as DocumentoRdo['obra'], frentes, urls: {}, maoObra: [], equipamentos: [], atividades: [], anotacoes: [], fotos: [], ...extra };
+  const doc: DocumentoRdo = { rdo, obra: { nome: 'Ponte Sul' } as DocumentoRdo['obra'], frentes, urls: {}, logoUrl: null, assinaturaUrl: null, maoObra: [], equipamentos: [], atividades: [], anotacoes: [], fotos: [], ...extra };
   const { container } = render(<PrintView doc={doc} />);
   const pdf = container.querySelector('.print-only') as HTMLElement;
   return { pdf, titulos: Array.from(pdf.querySelectorAll('.font-display.text-sm')).map(t => t.textContent) };
 }
 afterEach(cleanup);
+
+describe('Cabeçalho e dados da obra', () => {
+  const obra = { nome: 'SANEAMENTO E URBANIZAÇÃO DA BACIA DO CANAL DE MÁRTIR, URBANIZAÇÃO, ACESSO VIÁRIO, ALARGAMENTO E RETIFICAÇÃO DO CANAL DO MURUTUCU', cliente: 'Governo', fiscalizacao: 'SEOP', endereco: 'Passagem', gerenciadora: 'Infra', responsavel_tecnico: 'Consórcio', contrato: '059/2023', data_inicio: '2024-01-30', prazo_previsto: '2026-09-30' } as DocumentoRdo['obra'];
+  it('lista os campos na ordem pedida, sem repetir obra e logo', () => {
+    const { pdf } = montar({ obra });
+    const rotulos = Array.from(pdf.querySelectorAll('table')[0]?.querySelectorAll('td.bg-muted') ?? []).map(td => td.textContent);
+    expect(rotulos).toEqual(['Cliente', 'Fiscalização', 'Local', 'Gerenciadora', 'Contratada', 'Contrato nº', 'Início contratual', 'Término contratual']);
+    expect(pdf.querySelectorAll('table')[0]?.textContent).not.toContain('SANEAMENTO');
+    expect(pdf.textContent).toContain('30/01/2024');
+    expect(pdf.textContent).toContain('30/09/2026');
+  });
+  it('reduz a fonte de nomes longos e mantém a de nomes curtos', () => {
+    const titulo = (pdf: HTMLElement) => pdf.querySelector('.uppercase.font-display.font-bold') as HTMLElement;
+    expect(titulo(montar({ obra }).pdf).className).toContain('text-[13px]');
+    cleanup();
+    expect(titulo(montar({ obra: { ...obra, nome: 'Ponte Sul' } }).pdf).className).toContain('text-2xl');
+  });
+  it('mostra a logo só quando existe', () => {
+    expect(montar({ obra }).pdf.querySelector('img')).toBeNull();
+    cleanup();
+    expect(montar({ obra, logoUrl: 'https://exemplo/logo.png' }).pdf.querySelector('img')?.getAttribute('src')).toBe('https://exemplo/logo.png');
+  });
+});
+
+describe('Assinaturas no PDF', () => {
+  it('usa Contratada e Gerenciadora nos campos', () => {
+    const { pdf } = montar();
+    expect(pdf.textContent).toContain('Contratada');
+    expect(pdf.textContent).toContain('Gerenciadora');
+    expect(pdf.textContent).not.toContain('Responsável pela obra');
+    expect(pdf.textContent).not.toContain('Fiscalização / Cliente');
+    expect(pdf.querySelector('img')).toBeNull();
+  });
+  it('coloca a imagem sobre a linha da contratada, sem texto de assinatura digital', () => {
+    const { pdf } = montar({ assinaturaUrl: 'https://exemplo/a.png', rdo: { ...rdo, assinado_nome: 'Gerente', assinado_em: '2026-11-02T10:00:00Z' } });
+    const img = pdf.querySelector('img.mix-blend-multiply') as HTMLImageElement;
+    expect(img.getAttribute('src')).toBe('https://exemplo/a.png');
+    expect(img.style.transform).toContain('rotate');
+    expect(img.nextElementSibling?.nextElementSibling?.textContent).toBe('Contratada');
+    expect(pdf.textContent).not.toMatch(/assinado (digitalmente|por)/i);
+  });
+});
 
 describe('PDF do RDO360', () => {
   it('usa a marca, a lua na noite anterior e a ordem das frentes', () => {
@@ -23,7 +65,9 @@ describe('PDF do RDO360', () => {
     expect(pdf.textContent).toContain('RDO360 – Diário de obra:');
     expect(pdf.textContent).toContain('Ponte Sul');
     expect(pdf.textContent).toContain('🌙 Bom');
-    expect(pdf.textContent).toContain('1,5 mm');
+    expect(pdf.textContent).toContain('Precipitação (mm)');
+    expect(pdf.textContent).not.toContain('Pluvi');
+    expect(pdf.textContent).toContain('1,5');
     const locais = Array.from(pdf.querySelectorAll('tbody td.font-semibold')).map(td => td.textContent).filter(t => t === 'Canteiro' || t === 'Murutucu');
     expect(locais).toEqual(['Canteiro', 'Murutucu']);
   });
