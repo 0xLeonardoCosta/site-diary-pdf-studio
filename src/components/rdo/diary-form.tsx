@@ -51,7 +51,7 @@ export function DiaryForm({ date, dia, userId, numero }: { date: string; dia: Di
         </header>
 
         <main className="mx-auto max-w-4xl space-y-5 px-4 py-6">
-          {rdo && <ImportarRascunho key={rdo.id} date={date} rdo={rdo} obra={obra} frentes={frentes} />}
+          {rdo && <ImportarRascunho key={rdo.id} date={date} rdo={rdo} dia={dia} obra={obra} frentes={frentes} />}
           {rdo
             ? <SecoesDoDia key={rdo.id} rdo={rdo} dia={dia} date={date} userId={userId} frentes={frentes} urls={urls} assinaturaUrl={assinaturaUrl} />
             : <p className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">Crie o RDO deste dia, no topo da página, para começar o preenchimento.</p>}

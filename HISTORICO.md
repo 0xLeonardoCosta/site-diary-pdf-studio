@@ -70,6 +70,12 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
 35. RDO assinado travado para alterações, e a permissão "Alterar RDO's assinados".
 36. Botão "Excluir RDO's" no Histórico, com alerta e confirmação em vermelho.
 
+### 1.6 Correção da importação de rascunhos antigos (02/11/2026)
+
+37. O aviso de rascunho passou a mostrar o que será importado e o que difere do RDO.
+38. A importação não duplica lançamentos nem substitui valores, e ignora o que o formulário antigo preenchia sozinho.
+39. Rascunhos sem nada novo são limpos automaticamente, e RDOs travados não aceitam importação.
+
 ---
 
 ## 2. Funções atuais
@@ -102,6 +108,13 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
   - **6. Ocorrências e observações:** gerais e de segurança do trabalho, com uma anotação por autor.
   - **7. Registro fotográfico:** até 20 fotos com legenda, e opção de incluir no PDF.
   - **8. Assinaturas:** Contratada e Gerenciadora, e o botão de assinar.
+
+### Rascunhos antigos
+
+- Aparecem como aviso no dia, só no navegador em que foram digitados, antes da mudança de 30/10/2026.
+- O aviso lista o que será importado, o que difere do RDO e o que está sem local.
+- Importar só acrescenta o que falta. Fotos não têm como ser comparadas, então o aviso as mostra para conferência.
+- Descartar apaga apenas o rascunho daquele navegador.
 
 ### Aba Dados
 
