@@ -21,11 +21,11 @@ export const Route = createFileRoute('/_authenticated/graficos')({
   ] }),
   component: Graficos, errorComponent: RdoErro, notFoundComponent: RdoNaoEncontrado,
 });
-const ABAS = [{ id: 'efetivo', rotulo: 'Efetivo' }, { id: 'cronograma', rotulo: 'Cronograma de atividades' }] as const;
+const ABAS = [{ id: 'cronograma', rotulo: 'Cronograma de atividades' }, { id: 'efetivo', rotulo: 'Efetivo' }] as const;
 function Graficos() {
   const { perfil } = Route.useRouteContext();
   const navigate = useNavigate();
-  const [aba, setAba] = useState<(typeof ABAS)[number]['id']>('efetivo');
+  const [aba, setAba] = useState<(typeof ABAS)[number]['id']>('cronograma');
   const { data: efetivo } = useSuspenseQuery(efetivoDiarioQuery(perfil.id));
   const { data: cronograma } = useSuspenseQuery(cronogramaQuery(perfil.id));
   const { data: frentes } = useSuspenseQuery(frentesQuery(perfil.id));
@@ -43,9 +43,9 @@ function Graficos() {
           </button>
         ))}
       </div>
-      {aba === 'efetivo'
-        ? <GraficoEfetivo pontos={efetivo} />
-        : <Cronograma rdos={cronograma.rdos} atividades={cronograma.atividades} frentes={frentes} aoAbrirDia={data => void navigate({ to: '/rdo/$data', params: { data } })} />}
+      {aba === 'cronograma'
+        ? <Cronograma rdos={cronograma.rdos} atividades={cronograma.atividades} frentes={frentes} aoAbrirDia={data => void navigate({ to: '/rdo/$data', params: { data } })} />
+        : <GraficoEfetivo pontos={efetivo} />}
     </main>
   );
 }

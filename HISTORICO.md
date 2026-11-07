@@ -91,7 +91,7 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
 
 ### 1.9 Cronograma de atividades (07/11/2026)
 
-47. Aba Gráficos dividida em Efetivo e Cronograma de atividades.
+47. Aba Gráficos dividida em Cronograma de atividades (primeira) e Efetivo.
 48. Cronograma em estilo Gantt: cada atividade por frente, marcada nos dias em que aparece nos RDOs, com filtros de período, frente e busca, e clique para abrir o RDO do dia.
 
 ---
