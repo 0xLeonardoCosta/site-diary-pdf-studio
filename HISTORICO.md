@@ -89,6 +89,11 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
 45. Importação dos RDOs nº 1001 a 1011 (26/10 a 05/11/2026) a partir das planilhas de outubro e novembro, pulando dias já preenchidos no app.
 46. Histórico lê o efetivo em partes de 1000 linhas e não falha mais com muitos lançamentos.
 
+### 1.9 Cronograma de atividades (07/11/2026)
+
+47. Aba Gráficos dividida em Efetivo e Cronograma de atividades.
+48. Cronograma em estilo Gantt: cada atividade por frente, marcada nos dias em que aparece nos RDOs, com filtros de período, frente e busca, e clique para abrir o RDO do dia.
+
 ---
 
 ## 2. Funções atuais
@@ -161,6 +166,7 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
 - **Semanas** (segunda a domingo, com o intervalo no eixo, como "25/08 - 31/08") e **meses:** média dos dias que têm RDO, incluindo domingos e feriados registrados.
 - Dica ao passar o mouse e tabela com todos os valores.
 - Mostra só os RDOs que o usuário pode ver.
+- **Cronograma de atividades:** uma linha por atividade, agrupada por frente e na cor dela, marcada em cada dia em que aparece no RDO. Dias seguidos formam uma barra, e dias sem serviço ficam hachurados. Filtra por mês ou todo o período, por frente e por texto (sem diferenciar acentos). Passar o mouse mostra os dias e o período, e clicar abre o RDO daquele dia.
 
 ### Histórico
 

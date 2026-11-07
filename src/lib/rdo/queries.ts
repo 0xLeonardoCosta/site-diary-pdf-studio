@@ -159,6 +159,27 @@ export const efetivoDiarioQuery = (userId: string) => queryOptions({
     return rdos.map(r => ({ data: r.data, total: totais.get(r.id) ?? 0 }));
   },
 });
+// Every activity of every RDO the user can see, for the schedule. Paged like the headcount.
+export const cronogramaQuery = (userId: string) => queryOptions({
+  queryKey: ['rdo', userId, 'cronograma'],
+  queryFn: async () => {
+    const rdos: { id: string; data: string }[] = [];
+    for (let start = 0; ; start += 1000) {
+      const { data, error } = await supabase.from('rdos').select('id, data').order('data').order('id').range(start, start + 999);
+      if (error) throw error;
+      rdos.push(...data);
+      if (data.length < 1000) break;
+    }
+    const atividades: { rdo_id: string; frente_id: string; descricao: string }[] = [];
+    for (let start = 0; ; start += 1000) {
+      const { data, error } = await supabase.from('atividades').select('rdo_id, frente_id, descricao').order('id').range(start, start + 999);
+      if (error) throw error;
+      atividades.push(...data);
+      if (data.length < 1000) break;
+    }
+    return { rdos, atividades };
+  },
+});
 export const TAMANHO_PAGINA = 30;
 export const historicoQuery = (userId: string, mes: string) => infiniteQueryOptions({
   queryKey: ['rdo', userId, 'historico', mes], initialPageParam: 0,
