@@ -46,4 +46,15 @@ describe('Contrato com o banco existente', () => {
     expect(mock.calls.filter(c => c.method === 'in').map(c => c.args)).toEqual([['rdo_id', ['a', 'b']]]);
     expect(result.rows.map(r => r.total)).toEqual([10, 1]);
   });
+  it('efetivo com mais de 1000 linhas é lido em páginas, sem erro', async () => {
+    mock.results.push({ data: [{ id: 'a', data: '2026-10-27', numero: 1002, status: 'fechado' }], error: null });
+    mock.results.push({ data: Array.from({ length: 1000 }, () => ({ rdo_id: 'a', quantidade: 1 })), error: null });
+    mock.results.push({ data: [{ rdo_id: 'a', quantidade: 5 }], error: null });
+    const options = historicoQuery('usuario', '');
+    const fn = options.queryFn;
+    if (typeof fn !== 'function') throw new Error('Missing query function');
+    const result = await fn({ pageParam: 0, queryKey: options.queryKey, signal: new AbortController().signal, direction: 'forward', meta: undefined, client: new QueryClient() });
+    expect(mock.calls.filter(c => c.method === 'range').map(c => c.args)).toEqual([[0, 29], [0, 999], [1000, 1999]]);
+    expect(result.rows[0]?.total).toBe(1005);
+  });
 });

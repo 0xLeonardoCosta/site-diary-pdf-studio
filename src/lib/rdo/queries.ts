@@ -172,12 +172,12 @@ export const historicoQuery = (userId: string, mes: string) => infiniteQueryOpti
     if (error) throw error;
     const ids = data.map(r => r.id);
     const totais: Record<string, number> = {};
-    if (ids.length) {
-      const mao = await supabase.from('mao_obra').select('rdo_id, quantidade', { count: 'exact' }).in('rdo_id', ids);
+    // The API returns at most 1000 rows a request, and 30 days of labor lines pass that: read in pages.
+    for (let start = 0; ids.length; start += 1000) {
+      const mao = await supabase.from('mao_obra').select('rdo_id, quantidade').in('rdo_id', ids).order('id').range(start, start + 999);
       if (mao.error) throw mao.error;
-      // The API caps responses: do not display a silently truncated total.
-      if (mao.count !== null && mao.count > mao.data.length) throw new Error('O efetivo deste lote excedeu o limite de consulta. Selecione um mês com menos registros.');
       for (const row of mao.data) totais[row.rdo_id] = (totais[row.rdo_id] ?? 0) + row.quantidade;
+      if (mao.data.length < 1000) break;
     }
     return { rows: data.map(r => ({ ...r, total: totais[r.id] ?? 0 })), next: data.length === TAMANHO_PAGINA ? pageParam + TAMANHO_PAGINA : undefined };
   },

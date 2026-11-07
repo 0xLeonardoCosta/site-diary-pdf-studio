@@ -84,6 +84,11 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
 43. Atividades no PDF agrupadas por frente, em duas colunas equilibradas, no mesmo estilo da mão de obra. O título só se repete, como "(Continuação)", quando o grupo vira de página.
 44. Aba Gráficos: efetivo por dia de um mês, média por semana (com o intervalo da semana no eixo) e média por mês.
 
+### 1.8 Importação até 05/11 e correção do Histórico (07/11/2026)
+
+45. Importação dos RDOs nº 1001 a 1011 (26/10 a 05/11/2026) a partir das planilhas de outubro e novembro, pulando dias já preenchidos no app.
+46. Histórico lê o efetivo em partes de 1000 linhas e não falha mais com muitos lançamentos.
+
 ---
 
 ## 2. Funções atuais
