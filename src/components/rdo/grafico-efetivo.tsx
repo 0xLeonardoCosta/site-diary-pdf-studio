@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipProps } from 'recharts';
 import { agruparEfetivo, rotuloMes, type Barra, type ModoGrafico, type PontoEfetivo } from '@/lib/rdo/graficos';
-import { numeroParaTexto } from '@/lib/rdo/rules';
+import { CATEGORIAS, ROTULOS, numeroParaTexto } from '@/lib/rdo/rules';
 
 const MODOS: { id: ModoGrafico; rotulo: string }[] = [
   { id: 'dia', rotulo: 'Dias do mês' },
   { id: 'semana', rotulo: 'Semanas' },
   { id: 'mes', rotulo: 'Meses' },
 ];
+// Validated categorical slots, in the categories' own order; stacked bottom to top.
+const COR = { indireto: '#2a78d6', direto: '#eb6834', terceirizado: '#1baf7a' } as const;
 const valorTexto = (v: number | null) => (v === null ? 'Sem RDO' : numeroParaTexto(v));
 
 function Dica({ active, payload, modo }: TooltipProps<number, string> & { modo: ModoGrafico }) {
@@ -16,7 +18,10 @@ function Dica({ active, payload, modo }: TooltipProps<number, string> & { modo: 
   return (
     <div className="rounded-md border bg-card px-3 py-2 text-sm shadow-md">
       <p className="font-semibold">{barra.detalhe}</p>
-      <p>{modo === 'dia' ? 'Efetivo' : 'Média do efetivo'}: <b>{valorTexto(barra.valor)}</b></p>
+      {[...CATEGORIAS].reverse().map(c => (
+        <p key={c} className="flex items-center gap-2"><span aria-hidden className="size-2.5 rounded-sm" style={{ background: COR[c] }} />{ROTULOS[c]}: <b>{valorTexto(barra[c])}</b></p>
+      ))}
+      <p className="mt-1 border-t pt-1">{modo === 'dia' ? 'Efetivo total' : 'Média do efetivo'}: <b>{valorTexto(barra.valor)}</b></p>
       {modo !== 'dia' && <p className="text-muted-foreground">{barra.dias === 1 ? '1 dia com RDO' : `${barra.dias} dias com RDO`}</p>}
     </div>
   );
@@ -52,7 +57,10 @@ export function GraficoEfetivo({ pontos }: { pontos: PontoEfetivo[] }) {
 
       <div className="rounded-xl border bg-card p-4 shadow-sm">
         <h2 className="font-semibold">{titulo}</h2>
-        <p className="mb-3 text-sm text-muted-foreground">{modo === 'dia' ? 'Efetivo total registrado em cada RDO. Dias sem RDO ficam vazios.' : 'Média dos dias que têm RDO, incluindo domingos e feriados registrados.'}</p>
+        <p className="mb-2 text-sm text-muted-foreground">{modo === 'dia' ? 'Efetivo registrado em cada RDO, dividido por categoria. Dias sem RDO ficam vazios.' : 'Média dos dias que têm RDO, por categoria, incluindo domingos e feriados registrados.'}</p>
+        <ul aria-label="Legenda" className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          {CATEGORIAS.map(c => <li key={c} className="flex items-center gap-2"><span aria-hidden className="size-3 rounded-sm" style={{ background: COR[c] }} />{ROTULOS[c]}</li>)}
+        </ul>
         {comDados.length ? (
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -63,7 +71,11 @@ export function GraficoEfetivo({ pontos }: { pontos: PontoEfetivo[] }) {
                   {...(modo === 'semana' ? { angle: -35, textAnchor: 'end', height: 56, interval: 0 } : { interval: 'preserveStartEnd' as const, minTickGap: 4 })} />
                 <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={40} tick={{ fontSize: 11, fill: 'var(--grafico-texto)' }} />
                 <Tooltip cursor={{ fill: 'var(--grafico-cursor)' }} content={<Dica modo={modo} />} />
-                <Bar dataKey="valor" name="Efetivo" fill="var(--grafico-barra)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false} />
+                {/* A surface-coloured stroke keeps a thin gap between stacked segments. */}
+                {CATEGORIAS.map((c, i) => (
+                  <Bar key={c} dataKey={c} name={ROTULOS[c]} stackId="efetivo" fill={COR[c]} stroke="var(--card)" strokeWidth={1}
+                    radius={i === CATEGORIAS.length - 1 ? [4, 4, 0, 0] : 0} maxBarSize={24} isAnimationActive={false} />
+                ))}
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -72,14 +84,28 @@ export function GraficoEfetivo({ pontos }: { pontos: PontoEfetivo[] }) {
 
       <details className="rounded-xl border bg-card p-4 text-sm">
         <summary className="cursor-pointer font-semibold">Ver valores em tabela</summary>
-        <table className="mt-3 w-full border-collapse">
-          <thead><tr className="border-b text-left"><th className="py-1">{modo === 'dia' ? 'Dia' : modo === 'semana' ? 'Semana' : 'Mês'}</th><th className="py-1 text-right">{modo === 'dia' ? 'Efetivo' : 'Média'}</th>{modo !== 'dia' && <th className="py-1 text-right">Dias com RDO</th>}</tr></thead>
-          <tbody>
-            {(modo === 'dia' ? barras : comDados).map(b => (
-              <tr key={b.chave} className="border-b last:border-0"><td className="py-1">{b.detalhe}</td><td className="py-1 text-right font-semibold">{valorTexto(b.valor)}</td>{modo !== 'dia' && <td className="py-1 text-right">{b.dias}</td>}</tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="mt-3 w-full border-collapse">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="py-1">{modo === 'dia' ? 'Dia' : modo === 'semana' ? 'Semana' : 'Mês'}</th>
+                {CATEGORIAS.map(c => <th key={c} className="py-1 text-right">{ROTULOS[c]}</th>)}
+                <th className="py-1 text-right">{modo === 'dia' ? 'Total' : 'Média total'}</th>
+                {modo !== 'dia' && <th className="py-1 text-right">Dias com RDO</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {(modo === 'dia' ? barras : comDados).map(b => (
+                <tr key={b.chave} className="border-b last:border-0">
+                  <td className="py-1">{b.detalhe}</td>
+                  {CATEGORIAS.map(c => <td key={c} className="py-1 text-right">{b.valor === null ? '' : valorTexto(b[c])}</td>)}
+                  <td className="py-1 text-right font-semibold">{valorTexto(b.valor)}</td>
+                  {modo !== 'dia' && <td className="py-1 text-right">{b.dias}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </details>
     </section>
   );

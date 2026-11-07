@@ -1,7 +1,7 @@
 import { queryOptions, infiniteQueryOptions, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
-import { somaDias } from './rules';
+import { somaDias, type Categoria } from './rules';
 import { BUCKET_ASSINATURAS, BUCKET_FOTOS, BUCKET_LOGOS } from './salvar';
 
 export type RdoBanco = Tables<'rdos'>;
@@ -149,14 +149,21 @@ export const efetivoDiarioQuery = (userId: string) => queryOptions({
       rdos.push(...data);
       if (data.length < 1000) break;
     }
-    const totais = new Map<string, number>();
+    const totais = new Map<string, Record<Categoria, number>>();
     for (let start = 0; ; start += 1000) {
-      const { data, error } = await supabase.from('mao_obra').select('rdo_id, quantidade').order('id').range(start, start + 999);
+      const { data, error } = await supabase.from('mao_obra').select('rdo_id, categoria, quantidade').order('id').range(start, start + 999);
       if (error) throw error;
-      for (const row of data) totais.set(row.rdo_id, (totais.get(row.rdo_id) ?? 0) + row.quantidade);
+      for (const row of data) {
+        const t = totais.get(row.rdo_id) ?? { indireto: 0, direto: 0, terceirizado: 0 };
+        if (row.categoria in t) t[row.categoria as Categoria] += row.quantidade;
+        totais.set(row.rdo_id, t);
+      }
       if (data.length < 1000) break;
     }
-    return rdos.map(r => ({ data: r.data, total: totais.get(r.id) ?? 0 }));
+    return rdos.map(r => {
+      const t = totais.get(r.id) ?? { indireto: 0, direto: 0, terceirizado: 0 };
+      return { data: r.data, ...t, total: t.indireto + t.direto + t.terceirizado };
+    });
   },
 });
 // Every activity of every RDO the user can see, for the schedule. Paged like the headcount.

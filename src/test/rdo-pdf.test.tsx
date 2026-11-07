@@ -22,7 +22,7 @@ describe('Cabeçalho e dados da obra', () => {
   it('lista os campos na ordem pedida, sem repetir obra e logo', () => {
     const { pdf } = montar({ obra });
     const rotulos = Array.from(pdf.querySelectorAll('table')[0]?.querySelectorAll('td.bg-muted') ?? []).map(td => td.textContent);
-    expect(rotulos).toEqual(['Cliente', 'Fiscalização', 'Local', 'Gerenciadora', 'Contratada', 'Contrato nº', 'Início contratual', 'Término contratual']);
+    expect(rotulos).toEqual(['Cliente', 'Contratada', 'Fiscalização', 'Gerenciadora', 'Local', 'Contrato nº', 'Início contratual', 'Término contratual']);
     expect(pdf.querySelectorAll('table')[0]?.textContent).not.toContain('SANEAMENTO');
     expect(pdf.textContent).toContain('30/01/2024');
     expect(pdf.textContent).toContain('30/09/2026');

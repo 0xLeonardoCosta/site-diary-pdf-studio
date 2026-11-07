@@ -94,6 +94,11 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
 47. Aba Gráficos dividida em Cronograma de atividades (primeira) e Efetivo.
 48. Cronograma em estilo Gantt: cada atividade por frente, marcada nos dias em que aparece nos RDOs, com filtros de período, frente e busca, e clique para abrir o RDO do dia.
 
+### 1.10 Composição do efetivo e ordem dos dados da obra (07/11/2026)
+
+49. Gráfico de efetivo com as barras divididas em Indireto, Direto e Terceirizado, com legenda, detalhe por categoria e tabela.
+50. Item 1 do PDF na ordem Cliente, Contratada, Fiscalização, Gerenciadora, Local, Contrato nº, Início e Término contratual.
+
 ---
 
 ## 2. Funções atuais
@@ -161,7 +166,7 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
 
 ### Gráficos
 
-- Barras verticais do efetivo total ao longo do tempo.
+- Barras verticais do efetivo ao longo do tempo, divididas por cor em Indireto, Direto e Terceirizado.
 - **Dias do mês:** efetivo exato de cada RDO no mês escolhido. Dias sem RDO ficam vazios.
 - **Semanas** (segunda a domingo, com o intervalo no eixo, como "25/08 - 31/08") e **meses:** média dos dias que têm RDO, incluindo domingos e feriados registrados.
 - Dica ao passar o mouse e tabela com todos os valores.

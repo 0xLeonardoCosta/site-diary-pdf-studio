@@ -107,7 +107,7 @@ export function PrintView({ doc, novaPagina }: { doc: DocumentoRdo; novaPagina?:
       <PH n={1}>Dados da obra</PH>
       <table className="w-full border-collapse">
         <tbody>
-          {[["Cliente", obra.cliente, "Fiscalização", obra.fiscalizacao], ["Local", obra.endereco, "Gerenciadora", obra.gerenciadora], ["Contratada", obra.responsavel_tecnico, "Contrato nº", obra.contrato], ["Início contratual", fmt(obra.data_inicio), "Término contratual", fmt(obra.prazo_previsto)]].map((l, i) => (
+          {[["Cliente", obra.cliente, "Contratada", obra.responsavel_tecnico], ["Fiscalização", obra.fiscalizacao, "Gerenciadora", obra.gerenciadora], ["Local", obra.endereco, "Contrato nº", obra.contrato], ["Início contratual", fmt(obra.data_inicio), "Término contratual", fmt(obra.prazo_previsto)]].map((l, i) => (
             <tr key={i} className="border-b">
               <td className="w-32 whitespace-nowrap bg-muted px-2 py-0.5 font-semibold">{l[0]}</td><td className="px-2 py-0.5">{l[1] || "—"}</td>
               <td className="w-32 whitespace-nowrap bg-muted px-2 py-0.5 font-semibold">{l[2]}</td><td className="px-2 py-0.5">{l[3] || "—"}</td>
