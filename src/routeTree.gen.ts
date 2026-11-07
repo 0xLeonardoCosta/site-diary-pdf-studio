@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedDadosRouteImport } from './routes/_authenticated/dados'
 import { Route as AuthenticatedEquipeRouteImport } from './routes/_authenticated/equipe'
+import { Route as AuthenticatedGraficosRouteImport } from './routes/_authenticated/graficos'
 import { Route as AuthenticatedHistoricoRouteImport } from './routes/_authenticated/historico'
 import { Route as AuthenticatedRdoDataRouteImport } from './routes/_authenticated/rdo.$data'
 
@@ -41,6 +42,11 @@ const AuthenticatedEquipeRoute = AuthenticatedEquipeRouteImport.update({
   path: '/equipe',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedGraficosRoute = AuthenticatedGraficosRouteImport.update({
+  id: '/graficos',
+  path: '/graficos',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedHistoricoRoute = AuthenticatedHistoricoRouteImport.update({
   id: '/historico',
   path: '/historico',
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/dados': typeof AuthenticatedDadosRoute
   '/equipe': typeof AuthenticatedEquipeRoute
+  '/graficos': typeof AuthenticatedGraficosRoute
   '/historico': typeof AuthenticatedHistoricoRoute
   '/rdo/$data': typeof AuthenticatedRdoDataRoute
 }
@@ -64,6 +71,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/dados': typeof AuthenticatedDadosRoute
   '/equipe': typeof AuthenticatedEquipeRoute
+  '/graficos': typeof AuthenticatedGraficosRoute
   '/historico': typeof AuthenticatedHistoricoRoute
   '/': typeof AuthenticatedIndexRoute
   '/rdo/$data': typeof AuthenticatedRdoDataRoute
@@ -74,21 +82,37 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/dados': typeof AuthenticatedDadosRoute
   '/_authenticated/equipe': typeof AuthenticatedEquipeRoute
+  '/_authenticated/graficos': typeof AuthenticatedGraficosRoute
   '/_authenticated/historico': typeof AuthenticatedHistoricoRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/rdo/$data': typeof AuthenticatedRdoDataRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/dados' | '/equipe' | '/historico' | '/rdo/$data'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/dados'
+    | '/equipe'
+    | '/graficos'
+    | '/historico'
+    | '/rdo/$data'
   fileRoutesByTo: FileRoutesByTo
-  to: '/auth' | '/dados' | '/equipe' | '/historico' | '/' | '/rdo/$data'
+  to:
+    | '/auth'
+    | '/dados'
+    | '/equipe'
+    | '/graficos'
+    | '/historico'
+    | '/'
+    | '/rdo/$data'
   id:
     | '__root__'
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/dados'
     | '/_authenticated/equipe'
+    | '/_authenticated/graficos'
     | '/_authenticated/historico'
     | '/_authenticated/'
     | '/_authenticated/rdo/$data'
@@ -136,6 +160,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedEquipeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/graficos': {
+      id: '/_authenticated/graficos'
+      path: '/graficos'
+      fullPath: '/graficos'
+      preLoaderRoute: typeof AuthenticatedGraficosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/historico': {
       id: '/_authenticated/historico'
       path: '/historico'
@@ -156,6 +187,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDadosRoute: typeof AuthenticatedDadosRoute
   AuthenticatedEquipeRoute: typeof AuthenticatedEquipeRoute
+  AuthenticatedGraficosRoute: typeof AuthenticatedGraficosRoute
   AuthenticatedHistoricoRoute: typeof AuthenticatedHistoricoRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedRdoDataRoute: typeof AuthenticatedRdoDataRoute
@@ -164,6 +196,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDadosRoute: AuthenticatedDadosRoute,
   AuthenticatedEquipeRoute: AuthenticatedEquipeRoute,
+  AuthenticatedGraficosRoute: AuthenticatedGraficosRoute,
   AuthenticatedHistoricoRoute: AuthenticatedHistoricoRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedRdoDataRoute: AuthenticatedRdoDataRoute,

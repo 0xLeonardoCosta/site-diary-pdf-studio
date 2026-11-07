@@ -59,6 +59,34 @@ describe('Assinaturas no PDF', () => {
   });
 });
 
+describe('Atividades e observações no PDF', () => {
+  it('na tela, sem medir, não mostra continuação', () => {
+    const muitas = Array.from({ length: 30 }, (_, i) => atividade(String(i), 'murutucu', `Serviço ${i}`));
+    const { pdf } = montar({ atividades: muitas });
+    expect(pdf.textContent).not.toMatch(/Continuação|cont\./i);
+    expect(pdf.querySelectorAll('[data-servicos] [data-entrada]')).toHaveLength(31);
+  });
+  it('agrupa os serviços por frente, na ordem das frentes, sem caixas vazias', () => {
+    const { pdf } = montar({ atividades: [atividade('3', 'murutucu', 'Dragagem'), atividade('1', 'canteiro', 'Forma'), atividade('2', 'canteiro', 'Armação')] });
+    const lista = pdf.querySelector('[data-servicos]') as HTMLElement;
+    const linhas = Array.from(lista.querySelectorAll('.bg-muted, .border-dotted')).map(e => e.textContent);
+    expect(linhas).toEqual(['Canteiro2', '•Forma', '•Armação', 'Murutucu1', '•Dragagem']);
+    expect(lista.querySelector('table')).toBeNull();
+  });
+  it('observações no item 6, sem o subtítulo das gerais', () => {
+    const { pdf, titulos } = montar({ anotacoes: [anotacao('ocorrencia', 'Visita da fiscalização'), anotacao('seguranca', 'DDS realizado')] });
+    expect(titulos).toContain('6. Ocorrências e observações');
+    expect(pdf.textContent).not.toContain('Ocorrências / observações gerais');
+    expect(pdf.textContent).toContain('Visita da fiscalização');
+    expect(pdf.textContent).toContain('Segurança do trabalho');
+  });
+  it('sem observações, o item 6 diz que não houve', () => {
+    const { pdf, titulos } = montar();
+    expect(titulos).toContain('6. Ocorrências e observações');
+    expect(pdf.textContent).toContain('Sem ocorrências ou observações.');
+  });
+});
+
 describe('PDF do RDO360', () => {
   it('usa a marca, a lua na noite anterior e a ordem das frentes', () => {
     const { pdf } = montar({ atividades: [atividade('1', 'murutucu', 'Forma'), atividade('2', 'canteiro', 'Limpeza')] });
@@ -68,8 +96,8 @@ describe('PDF do RDO360', () => {
     expect(pdf.textContent).toContain('Precipitação (mm)');
     expect(pdf.textContent).not.toContain('Pluvi');
     expect(pdf.textContent).toContain('1,5');
-    const locais = Array.from(pdf.querySelectorAll('tbody td.font-semibold')).map(td => td.textContent).filter(t => t === 'Canteiro' || t === 'Murutucu');
-    expect(locais).toEqual(['Canteiro', 'Murutucu']);
+    const frentes = Array.from(pdf.querySelectorAll('[data-servicos] .bg-muted span:first-child')).map(e => e.textContent);
+    expect(frentes).toEqual(['Canteiro', 'Murutucu']);
   });
   it('não inventa clima que ninguém lançou', () => {
     const { pdf } = montar();
@@ -92,6 +120,6 @@ describe('PDF do RDO360', () => {
   });
   it('resume o efetivo na ordem indireto, direto, terceirizado', () => {
     const { titulos } = montar({ maoObra: [linha('a', 'Pedreiro', 'direto', 6), linha('b', 'Engenheiro', 'indireto', 1), linha('c', 'Eletricista', 'terceirizado', 2)] });
-    expect(titulos).toContain('3. Mão de obra · Indireto 1 · Direto 6 · Terceirizado 2 · Efetivo total 9');
+    expect(titulos).toContain('3. Mão de obra · Efetivo total 9');
   });
 });

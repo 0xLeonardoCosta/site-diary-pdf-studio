@@ -3,7 +3,7 @@
 Aplicação web para preencher o Relatório Diário de Obra (RDO) em equipe, assinar e exportar em PDF.
 
 - **Tecnologia:** React com TanStack (rotas e dados), Supabase (banco, login, arquivos e tempo real) e Lovable (publicação).
-- **Atualizado em:** 02/11/2026.
+- **Atualizado em:** 07/11/2026.
 
 ---
 
@@ -76,6 +76,14 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
 38. A importação não duplica lançamentos nem substitui valores, e ignora o que o formulário antigo preenchia sozinho.
 39. Rascunhos sem nada novo são limpos automaticamente, e RDOs travados não aceitam importação.
 
+### 1.7 Ajustes do PDF e gráficos (07/11/2026)
+
+40. Título da mão de obra no PDF com destaque só para o efetivo total.
+41. Ocorrências e observações voltaram a ser o item 6, sem o subtítulo das observações gerais.
+42. No preenchimento das atividades, o local vem antes da descrição.
+43. Atividades no PDF agrupadas por frente, em duas colunas equilibradas, no mesmo estilo da mão de obra. O título só se repete, como "(Continuação)", quando o grupo vira de página.
+44. Aba Gráficos: efetivo por dia de um mês, média por semana (com o intervalo da semana no eixo) e média por mês.
+
 ---
 
 ## 2. Funções atuais
@@ -92,6 +100,7 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
 | RDO | Todos | Preencher e assinar o RDO do dia |
 | Dados | Quem tem "Editar dados da obra e frentes" | Dados contratuais e logo |
 | Histórico | Todos | Consultar, exportar e excluir RDOs |
+| Gráficos | Todos | Efetivo ao longo do tempo |
 | Equipe | Administradores | Usuários, permissões e assinaturas |
 
 ### RDO do dia
@@ -104,7 +113,7 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
   - **2. Condições climáticas:** clima por turno, horário de trabalho, precipitação às 07:00, 12:00 e 17:00, e maré máxima.
   - **3. Mão de obra:** funções e quantidades por categoria, com subtotais e efetivo total.
   - **4. Equipamentos:** descrição e quantidade.
-  - **5. Atividades executadas:** descrição e local, com sugestões de atividades já usadas naquela frente.
+  - **5. Atividades executadas:** local e descrição, com sugestões de atividades já usadas naquela frente.
   - **6. Ocorrências e observações:** gerais e de segurança do trabalho, com uma anotação por autor.
   - **7. Registro fotográfico:** até 20 fotos com legenda, e opção de incluir no PDF.
   - **8. Assinaturas:** Contratada e Gerenciadora, e o botão de assinar.
@@ -135,8 +144,18 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
 - Gerado pela janela de impressão do navegador, em A4.
 - Cabeçalho com logo, nome da obra, número, data e dia da semana.
 - Item 1 com os dados da obra, e seções numeradas.
-- Campos de ocorrência vazios e fotos desmarcadas não aparecem.
+- Mão de obra em colunas por categoria, com o efetivo total no título.
+- Atividades agrupadas por frente, com a quantidade de serviços no título do grupo, em duas colunas lidas de cima para baixo e da esquerda para a direita.
+- Item 6 com as ocorrências gerais direto sob o título e a segurança do trabalho com subtítulo. Fotos desmarcadas não aparecem.
 - A assinatura sai como imagem sobre a linha da Contratada, sem fundo e com pequena variação de posição entre RDOs.
+
+### Gráficos
+
+- Barras verticais do efetivo total ao longo do tempo.
+- **Dias do mês:** efetivo exato de cada RDO no mês escolhido. Dias sem RDO ficam vazios.
+- **Semanas** (segunda a domingo, com o intervalo no eixo, como "25/08 - 31/08") e **meses:** média dos dias que têm RDO, incluindo domingos e feriados registrados.
+- Dica ao passar o mouse e tabela com todos os valores.
+- Mostra só os RDOs que o usuário pode ver.
 
 ### Histórico
 

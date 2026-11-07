@@ -1,8 +1,8 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { MARCA } from "@/lib/marca";
 import { posicaoAssinatura } from "@/lib/rdo/assinatura";
 import type { DiaRdo, FrenteBanco, ObraBanco, RdoBanco } from "@/lib/rdo/queries";
-import { CATEGORIAS, COLETAS, ROTULOS, TURNOS, climaIcone, diaSemana, fmtData, numeroParaTexto, ordenarPorFrente, totalCategoria, totalEfetivo } from "@/lib/rdo/rules";
+import { CATEGORIAS, COLETAS, ROTULOS, TURNOS, climaIcone, diaSemana, entradasServicos, fmtData, paginarServicos, numeroParaTexto, ordenarPorFrente, totalCategoria, totalEfetivo } from "@/lib/rdo/rules";
 
 export type DocumentoRdo = Omit<DiaRdo, "rdo"> & { rdo: RdoBanco; obra: ObraBanco; frentes: FrenteBanco[]; urls: Record<string, string>; logoUrl: string | null; assinaturaUrl: string | null };
 
@@ -28,14 +28,42 @@ function PH({ n, children }: { n: number; children: ReactNode }) {
 function PLista({ itens }: { itens: { id: string; nome: string; qtd: ReactNode }[] }) {
   return <>{itens.map((x) => <div key={x.id} className="flex break-inside-avoid justify-between gap-2 border-b border-dotted px-1 py-px"><span className="min-w-0">{x.nome}</span><b>{x.qtd}</b></div>)}</>;
 }
-function PAnotacoes({ titulo, textos, recuo }: { titulo: string; textos: string[]; recuo?: boolean }) {
+function PAnotacoes({ titulo, textos }: { titulo?: string; textos: string[] }) {
   if (!textos.length) return null;
   return (
     <>
-      <div className={`font-semibold ${recuo ? "mt-1.5" : ""}`}>{titulo}</div>
+      {titulo && <div className="mt-2 break-after-avoid font-semibold">{titulo}</div>}
       <div className="space-y-1">{textos.map((t, i) => <p key={i} className="whitespace-pre-wrap rounded border px-2 py-1">{t}</p>)}</div>
     </>
   );
+}
+// Same group heading as the labor list, so both sections read alike.
+function PGrupo({ titulo, total, entrada }: { titulo: string; total: ReactNode; entrada?: number }) {
+  return <div data-entrada={entrada} className="flex justify-between bg-muted px-1 py-px font-bold uppercase"><span>{titulo}</span><span>{total}</span></div>;
+}
+function PServico({ texto, entrada }: { texto: string; entrada?: number }) {
+  return <div data-entrada={entrada} className="flex break-inside-avoid gap-1.5 border-b border-dotted px-1 py-px"><span aria-hidden className="text-muted-foreground">•</span><span className="min-w-0">{texto}</span></div>;
+}
+
+// Printing asks every document to measure itself first: page breaks are only known at print size.
+const EVENTO_PAGINAR = "rdo360:paginar";
+const ESPACO_GRUPO = 6;
+const FOLGA = 8;
+type Medidas = { topo: number; pagina: number; alturas: number[] };
+function medir(raiz: HTMLElement): Medidas | null {
+  const servicos = raiz.querySelector<HTMLElement>("[data-servicos]");
+  if (!servicos) return null;
+  raiz.classList.add("medindo");
+  try {
+    const sonda = document.createElement("div");
+    sonda.style.height = "277mm";
+    raiz.appendChild(sonda);
+    const pagina = sonda.getBoundingClientRect().height;
+    sonda.remove();
+    const alturas: number[] = [];
+    servicos.querySelectorAll<HTMLElement>("[data-entrada]").forEach((el) => { alturas[Number(el.dataset["entrada"])] = el.getBoundingClientRect().height; });
+    return { topo: servicos.getBoundingClientRect().top - raiz.getBoundingClientRect().top, pagina, alturas };
+  } finally { raiz.classList.remove("medindo"); }
 }
 export function PrintView({ doc, novaPagina }: { doc: DocumentoRdo; novaPagina?: boolean }) {
   const { rdo: r, obra, maoObra, frentes, urls } = doc;
@@ -45,8 +73,24 @@ export function PrintView({ doc, novaPagina }: { doc: DocumentoRdo; novaPagina?:
   const ocorrencias = textos("ocorrencia"), seguranca = textos("seguranca");
   const fotos = r.fotos_no_pdf ? doc.fotos : [];
   const nomeFrente = (id: string) => frentes.find((f) => f.id === id)?.nome ?? "Sem local";
+  const raiz = useRef<HTMLDivElement>(null);
+  const [medidas, setMedidas] = useState<Medidas | null>(null);
+  useEffect(() => {
+    const paginar = () => { if (raiz.current) setMedidas(medir(raiz.current)); };
+    window.addEventListener(EVENTO_PAGINAR, paginar);
+    return () => window.removeEventListener(EVENTO_PAGINAR, paginar);
+  }, []);
+  // Until measured (on screen), heights are estimated in lines and everything fits one page.
+  const estimadas = entradasServicos(atividades, 1, (t) => Math.max(1, Math.ceil(t.length / 60)));
+  const medidasValidas = medidas && estimadas.every((_, i) => medidas.alturas[i] !== undefined);
+  const entradas = medidasValidas ? estimadas.map((e, i) => ({ ...e, altura: medidas.alturas[i] ?? e.altura })) : estimadas;
+  const blocosServicos = paginarServicos(entradas, medidasValidas
+    ? { disponivel: medidas.pagina - (medidas.topo % medidas.pagina) - FOLGA, pagina: medidas.pagina - FOLGA, espacoGrupo: ESPACO_GRUPO }
+    : { disponivel: Infinity, pagina: Infinity, espacoGrupo: 0 });
+  // Blocks render entries in order, skipping only repeated headings, so a counter matches each entry's index.
+  let entrada = 0;
   return (
-    <div className={`print-only text-[11px] text-foreground ${novaPagina ? "break-before-page" : ""}`}>
+    <div ref={raiz} className={`print-only text-[11px] text-foreground ${novaPagina ? "break-before-page" : ""}`}>
       <div className="stripes h-2" />
       <div className="flex items-center gap-3 bg-navy px-3 py-2 text-navy-foreground">
         {doc.logoUrl && <LogoObra url={doc.logoUrl} />}
@@ -92,7 +136,7 @@ export function PrintView({ doc, novaPagina }: { doc: DocumentoRdo; novaPagina?:
         </div>
       </div>
 
-      <PH n={3}>Mão de obra · {CATEGORIAS.map((c) => `${ROTULOS[c]} ${totalCategoria(maoObra, c)}`).join(" · ")} · Efetivo total {total}</PH>
+      <PH n={3}>Mão de obra · Efetivo total {total}</PH>
       {maoObra.length ? (
         <div className="columns-3 gap-4">
           {CATEGORIAS.map((c) => {
@@ -100,7 +144,7 @@ export function PrintView({ doc, novaPagina }: { doc: DocumentoRdo; novaPagina?:
             if (!linhas.length) return null;
             return (
               <Fragment key={c}>
-                <div className="mt-1 flex break-inside-avoid break-after-avoid justify-between bg-muted px-1 py-px font-bold uppercase first:mt-0"><span>{ROTULOS[c]}</span><span>{totalCategoria(maoObra, c)}</span></div>
+                <div className="mt-1 break-inside-avoid break-after-avoid first:mt-0"><PGrupo titulo={ROTULOS[c]} total={totalCategoria(maoObra, c)} /></div>
                 <PLista itens={linhas.map((x) => ({ id: x.id, nome: x.funcao, qtd: x.quantidade }))} />
               </Fragment>
             );
@@ -115,23 +159,30 @@ export function PrintView({ doc, novaPagina }: { doc: DocumentoRdo; novaPagina?:
 
       <PH n={5}>Atividades executadas</PH>
       {atividades.length ? (
-        <table className="w-full border-collapse">
-          <thead><tr className="bg-muted text-left"><th className="w-28 px-2 py-0.5">Local</th><th className="px-2 py-0.5">Descrição do serviço</th></tr></thead>
-          <tbody>
-            {atividades.map((x, i) => (
-              <tr key={x.id} className="break-inside-avoid border-b">
-                <td className="px-2 py-0.5 align-top font-semibold">{i === 0 || atividades[i - 1]?.frente_id !== x.frente_id ? nomeFrente(x.frente_id) : ""}</td>
-                <td className="px-2 py-0.5">{x.descricao}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div data-servicos>
+          {blocosServicos.map((bloco, b) => (
+            <div key={b} className={`grid grid-cols-2 items-start gap-4 ${bloco.novaPagina ? "break-before-page" : ""}`}>
+              {bloco.colunas.map((coluna, c) => (
+                <div key={c}>
+                  {coluna.map((t, i) => (
+                    <div key={i} style={i > 0 ? { marginTop: ESPACO_GRUPO } : undefined}>
+                      {t.titulo === "novo" && <PGrupo entrada={entrada++} titulo={nomeFrente(t.frente)} total={atividades.filter((a) => a.frente_id === t.frente).length} />}
+                      {t.titulo === "continuacao" && <PGrupo titulo={`${nomeFrente(t.frente)} (Continuação)`} total="" />}
+                      {t.itens.map((texto, j) => <PServico key={j} entrada={entrada++} texto={texto} />)}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
       ) : <p className="px-1 text-muted-foreground">Nenhuma atividade registrada.</p>}
 
+      {/* The section band already names the general notes; only safety notes keep a subtitle. */}
       <PH n={6}>Ocorrências e observações</PH>
       {!ocorrencias.length && !seguranca.length && <p className="px-1 text-muted-foreground">Sem ocorrências ou observações.</p>}
-      <PAnotacoes titulo="Ocorrências / observações gerais" textos={ocorrencias} />
-      <PAnotacoes titulo="Segurança do trabalho" textos={seguranca} recuo={ocorrencias.length > 0} />
+      <PAnotacoes textos={ocorrencias} />
+      <PAnotacoes titulo="Segurança do trabalho" textos={seguranca} />
 
       {fotos.length > 0 && (
         <>
@@ -168,6 +219,10 @@ export function PrintView({ doc, novaPagina }: { doc: DocumentoRdo; novaPagina?:
 
 // Signed photo URLs load asynchronously; printing earlier would leave blank frames in the PDF.
 export async function imprimir() {
+  window.dispatchEvent(new Event(EVENTO_PAGINAR));
+  // Let React render the measured layout before the print snapshot.
+  await new Promise((pronto) => setTimeout(pronto, 50));
+  await new Promise((pronto) => requestAnimationFrame(() => requestAnimationFrame(pronto)));
   const imagens = Array.from(document.querySelectorAll<HTMLImageElement>(".print-only img"));
   await Promise.all(imagens.map((img) => img.decode().catch(() => undefined)));
   window.print();

@@ -103,11 +103,11 @@ export function Atividades({ linhas, frentes, ctx }: { linhas: AtividadeBanco[];
   };
   return (
     <div className="space-y-2">
-      <div className="flex gap-2 text-xs font-semibold uppercase text-muted-foreground"><span className="flex-1">Descrição do serviço</span><span className="w-36">Local</span><span className="w-9" /></div>
+      <div className="flex gap-2 text-xs font-semibold uppercase text-muted-foreground"><span className="w-36">Local</span><span className="flex-1">Descrição do serviço</span><span className="w-9" /></div>
       {ordenarPorFrente(linhas, frentes).map(x => <LinhaAtividade key={x.id} linha={x} frentes={frentes} ctx={ctx} />)}
       <div className="flex gap-2">
-        <DescricaoComSugestoes userId={ctx.userId} frente={frente} valor={descricao} alterar={setDescricao} enviar={adicionar} />
         <SelectFrente rotulo="Local da nova atividade" frentes={frentes} valor={frente} alterar={setFrente} />
+        <DescricaoComSugestoes userId={ctx.userId} frente={frente} valor={descricao} alterar={setDescricao} enviar={adicionar} />
         <span className="w-9 shrink-0" />
       </div>
       <Button onClick={adicionar} className="text-sm font-semibold text-accent-foreground hover:underline">+ Adicionar atividade</Button>
@@ -134,8 +134,8 @@ function LinhaAtividade({ linha, frentes, ctx }: { linha: AtividadeBanco; frente
   }, { pronto: v => Boolean(v.descricao.trim()) });
   return (
     <div className="flex gap-2">
-      <input aria-label="Descrição do serviço" disabled={!dono} className="field min-w-0 flex-1" value={c.valor.descricao} onChange={e => c.alterar({ ...c.valor, descricao: e.target.value })} onBlur={() => void c.confirmar()} />
       <SelectFrente rotulo="Local do serviço" disabled={!dono} frentes={frentes} valor={c.valor.frente_id} alterar={frente_id => c.alterar({ ...c.valor, frente_id })} />
+      <input aria-label="Descrição do serviço" disabled={!dono} className="field min-w-0 flex-1" value={c.valor.descricao} onChange={e => c.alterar({ ...c.valor, descricao: e.target.value })} onBlur={() => void c.confirmar()} />
       <Remover tabela="atividades" id={linha.id} ctx={ctx} disabled={!dono} />
     </div>
   );

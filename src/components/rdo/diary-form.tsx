@@ -201,14 +201,14 @@ function FotosNoPdf(campo: PropsCampo) {
   );
 }
 
-function Section({ n, title, children, permissao, extra, travado, rodape }: { n: string; title: string; children: ReactNode; permissao?: Permissao; extra?: ReactNode; travado?: boolean; rodape?: ReactNode }) {
+function Section({ n, title, children, permissao, extra, travado, rodape }: { n?: string; title: string; children: ReactNode; permissao?: Permissao; extra?: ReactNode; travado?: boolean; rodape?: ReactNode }) {
   const permitido = usePermissao(permissao ?? "editar_obra");
   const bloqueado = Boolean((permissao && !permitido) || travado);
   return (
     <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-5">
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h2 className="flex items-center gap-3 font-display text-xl font-bold uppercase text-primary">
-          <span className="grid h-8 w-8 place-items-center rounded bg-safety text-base text-safety-foreground">{n}</span>
+          {n && <span className="grid h-8 w-8 place-items-center rounded bg-safety text-base text-safety-foreground">{n}</span>}
           {title}
         </h2>
         {extra && <fieldset disabled={bloqueado} className="ml-auto">{extra}</fieldset>}

@@ -38,6 +38,77 @@ export function ordenarPorFrente<T extends { frente_id: string }>(rows: T[], fre
   return [...rows].sort((a, b) => pos(a.frente_id) - pos(b.frente_id));
 }
 // A signed RDO answers only to its own permission, whatever its open/closed status.
+export type EntradaServico = { frente: string; texto: string | null; altura: number };
+export type TrechoServicos = { frente: string; titulo: 'novo' | 'continuacao' | 'nenhum'; itens: string[] };
+export type BlocoServicos = { novaPagina: boolean; colunas: [TrechoServicos[], TrechoServicos[]] };
+/** One heading entry (texto null) before each work front's services, with a height for layout. */
+export function entradasServicos(atividades: { frente_id: string; descricao: string }[], alturaTitulo: number, alturaServico: (texto: string) => number): EntradaServico[] {
+  const entradas: EntradaServico[] = [];
+  atividades.forEach((a, i) => {
+    if (i === 0 || atividades[i - 1]?.frente_id !== a.frente_id) entradas.push({ frente: a.frente_id, texto: null, altura: alturaTitulo });
+    entradas.push({ frente: a.frente_id, texto: a.descricao, altura: alturaServico(a.descricao) });
+  });
+  return entradas;
+}
+/**
+ * Lays services out in two columns, read top to bottom then left to right. Columns fill what is
+ * left of the page (`disponivel`) and continue on new pages of height `pagina`. A heading never ends
+ * a column. A front cut by a page turn repeats its heading as a continuation; a front that only
+ * moves to the second column of the same page does not. The last block is balanced.
+ */
+export function paginarServicos(entradas: EntradaServico[], { disponivel, pagina, espacoGrupo }: { disponivel: number; pagina: number; espacoGrupo: number }): BlocoServicos[] {
+  const n = entradas.length;
+  const ehTitulo = (i: number) => entradas[i]?.texto === null;
+  const alturaTitulo = entradas.find(e => e.texto === null)?.altura ?? 0;
+  // Height of entries [a, b) stacked in one column.
+  const altura = (a: number, b: number, comContinuacao: boolean) => {
+    let h = comContinuacao ? alturaTitulo : 0;
+    for (let i = a; i < b; i++) h += (entradas[i]?.altura ?? 0) + (ehTitulo(i) && i > a ? espacoGrupo : 0);
+    return h;
+  };
+  // Furthest end that fits in `capacidade`, never leaving a heading last; at least one service.
+  const encher = (a: number, capacidade: number, comContinuacao: boolean) => {
+    let b = a;
+    while (b < n && altura(a, b + 1, comContinuacao) <= capacidade) b++;
+    if (b > a && ehTitulo(b - 1) && b < n) b--;
+    if (b === a && a < n) b = Math.min(n, a + (ehTitulo(a) ? 2 : 1));
+    return b;
+  };
+  const trechos = (a: number, b: number, tituloInicial: 'continuacao' | 'nenhum'): TrechoServicos[] => {
+    const lista: TrechoServicos[] = [];
+    for (let i = a; i < b; i++) {
+      const e = entradas[i];
+      if (!e) continue;
+      if (e.texto === null) lista.push({ frente: e.frente, titulo: 'novo', itens: [] });
+      else if (i === a) lista.push({ frente: e.frente, titulo: tituloInicial, itens: [e.texto] });
+      else lista[lista.length - 1]?.itens.push(e.texto);
+    }
+    return lista;
+  };
+  const blocos: BlocoServicos[] = [];
+  let i = 0, capacidade = disponivel, novaPagina = false;
+  while (i < n) {
+    let continua = novaPagina && !ehTitulo(i);
+    const minimo = altura(i, Math.min(n, i + (ehTitulo(i) ? 2 : 1)), continua);
+    // Not even a heading and its first service fit: start on the next page.
+    if (!novaPagina && minimo > capacidade) { capacidade = pagina; novaPagina = true; continua = !ehTitulo(i); }
+    const bloco = (meio: number, fim: number) => blocos.push({ novaPagina, colunas: [trechos(i, meio, continua ? 'continuacao' : 'nenhum'), trechos(meio, fim, 'nenhum')] });
+    if (altura(i, n, continua) <= 2 * capacidade) {
+      let melhor: number | null = null, diferenca = Infinity;
+      for (let corte = i + 1; corte <= n; corte++) {
+        if (ehTitulo(corte - 1) && corte < n) continue;
+        const h1 = altura(i, corte, continua), h2 = altura(corte, n, false);
+        if (h1 <= capacidade && h2 <= capacidade && Math.abs(h1 - h2) < diferenca) { diferenca = Math.abs(h1 - h2); melhor = corte; }
+      }
+      if (melhor !== null) { bloco(melhor, n); break; }
+    }
+    const meio = encher(i, capacidade, continua);
+    const fim = meio < n ? encher(meio, capacidade, false) : n;
+    bloco(meio, fim);
+    i = fim; capacidade = pagina; novaPagina = true;
+  }
+  return blocos;
+}
 export const rdoEditavel = (status: string | undefined, fechar: boolean, assinado = false, alterarAssinados = false) => (assinado ? alterarAssinados : status !== 'fechado' || fechar);
 export const podeEditarLinha = (criadoPor: string, userId: string, editarDeOutros: boolean) => criadoPor === userId || editarDeOutros;
 export const numeroParaTexto = (n: number | null) => (n === null ? '' : String(n).replace('.', ','));

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { numeroParaData, dataParaNumero, somaDias, hojeLocal, dataValida, numeroValido, quantidadeValida, normalizarFuncao, totalCategoria, totalEfetivo, podeEditarMaoObra, chaveLocal, CATEGORIAS, climaIcone, numeroParaTexto, ordenarPorFrente, podeEditarLinha, rdoEditavel, textoParaNumero } from '@/lib/rdo/rules';
+import { numeroParaData, dataParaNumero, somaDias, hojeLocal, dataValida, numeroValido, quantidadeValida, normalizarFuncao, totalCategoria, totalEfetivo, podeEditarMaoObra, chaveLocal, CATEGORIAS, climaIcone, entradasServicos, paginarServicos, numeroParaTexto, ordenarPorFrente, podeEditarLinha, rdoEditavel, textoParaNumero } from '@/lib/rdo/rules';
 
 describe('Número e data ligados', () => {
   it.each([[1000, '2026-10-25'], [1002, '2026-10-27'], [1007, '2026-11-01']] as const)('converte referência %i nos dois sentidos', (numero, data) => {
@@ -88,5 +88,47 @@ describe('Campos e permissões do RDO', () => {
     expect(rdoEditavel('fechado', false, true, true)).toBe(true);
     expect(podeEditarMaoObra(true, 'aberto', false, true, false)).toBe(false);
     expect(podeEditarMaoObra(false, 'aberto', false, true, true)).toBe(false);
+  });
+});
+describe('Serviços do PDF em duas colunas e páginas', () => {
+  const ativ = (frente_id: string, n: number) => Array.from({ length: n }, (_, i) => ({ frente_id, descricao: `${frente_id}${i + 1}` }));
+  // Every heading and service is 10px tall, so capacities read as line counts.
+  const entradas = (lista: { frente_id: string; descricao: string }[]) => entradasServicos(lista, 10, () => 10);
+  const resumo = (col: { frente: string; titulo: string; itens: string[] }[]) => col.map(t => `${t.frente}${t.titulo === 'continuacao' ? '(Continuação)' : t.titulo === 'nenhum' ? '…' : ''}:${t.itens.length}`);
+  const cabe = { disponivel: Infinity, pagina: Infinity, espacoGrupo: 0 };
+  it('na mesma página equilibra as colunas e não repete o título', () => {
+    const [bloco, ...resto] = paginarServicos(entradas([...ativ('canteiro', 2), ...ativ('reto', 17), ...ativ('muru', 10)]), cabe);
+    expect(resto).toEqual([]);
+    expect(resumo(bloco!.colunas[0])).toEqual(['canteiro:2', 'reto:12']);
+    expect(resumo(bloco!.colunas[1])).toEqual(['reto…:5', 'muru:10']);
+  });
+  it('ao virar de página repete o título como continuação', () => {
+    // 4 lines left on this page, 6 on each new page.
+    const blocos = paginarServicos(entradas(ativ('muru', 12)), { disponivel: 40, pagina: 60, espacoGrupo: 0 });
+    expect(blocos.map(b => b.novaPagina)).toEqual([false, true]);
+    expect(resumo(blocos[0]!.colunas[0])).toEqual(['muru:3']);
+    expect(resumo(blocos[0]!.colunas[1])).toEqual(['muru…:4']);
+    // The new page is balanced too: the repeated heading only opens the first column.
+    expect(resumo(blocos[1]!.colunas[0])).toEqual(['muru(Continuação):2']);
+    expect(resumo(blocos[1]!.colunas[1])).toEqual(['muru…:3']);
+  });
+  it('sem espaço para título e um serviço, começa na página seguinte, sem continuação', () => {
+    const blocos = paginarServicos(entradas(ativ('reto', 2)), { disponivel: 15, pagina: 100, espacoGrupo: 0 });
+    expect(blocos).toHaveLength(1);
+    expect(blocos[0]!.novaPagina).toBe(true);
+    expect(resumo(blocos[0]!.colunas[0])).toEqual(['reto:1']);
+    expect(resumo(blocos[0]!.colunas[1])).toEqual(['reto…:1']);
+  });
+  it('nunca termina uma coluna com um título', () => {
+    const blocos = paginarServicos(entradas([...ativ('a', 3), ...ativ('b', 3)]), { disponivel: 40, pagina: 40, espacoGrupo: 0 });
+    for (const b of blocos) for (const col of b.colunas) for (const t of col) expect(t.itens.length).toBeGreaterThan(0);
+    const total = blocos.flatMap(b => b.colunas.flat()).reduce((n, t) => n + t.itens.length, 0);
+    expect(total).toBe(6);
+  });
+  it('textos longos contam como mais linhas', () => {
+    const lista = [{ frente_id: 'a', descricao: 'y'.repeat(180) }, ...ativ('a', 4)];
+    const [bloco] = paginarServicos(entradasServicos(lista, 1, t => Math.max(1, Math.ceil(t.length / 60))), cabe);
+    expect(resumo(bloco!.colunas[0])).toEqual(['a:1']);
+    expect(resumo(bloco!.colunas[1])).toEqual(['a…:4']);
   });
 });

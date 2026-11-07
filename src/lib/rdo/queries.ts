@@ -138,6 +138,27 @@ export const filtroQuery = (userId: string, mes: string) => queryOptions({
     }
   },
 });
+// Daily headcount for every RDO the user can see. Paged: the API returns at most 1000 rows a request.
+export const efetivoDiarioQuery = (userId: string) => queryOptions({
+  queryKey: ['rdo', userId, 'efetivo-diario'],
+  queryFn: async () => {
+    const rdos: { id: string; data: string }[] = [];
+    for (let start = 0; ; start += 1000) {
+      const { data, error } = await supabase.from('rdos').select('id, data').order('data').order('id').range(start, start + 999);
+      if (error) throw error;
+      rdos.push(...data);
+      if (data.length < 1000) break;
+    }
+    const totais = new Map<string, number>();
+    for (let start = 0; ; start += 1000) {
+      const { data, error } = await supabase.from('mao_obra').select('rdo_id, quantidade').order('id').range(start, start + 999);
+      if (error) throw error;
+      for (const row of data) totais.set(row.rdo_id, (totais.get(row.rdo_id) ?? 0) + row.quantidade);
+      if (data.length < 1000) break;
+    }
+    return rdos.map(r => ({ data: r.data, total: totais.get(r.id) ?? 0 }));
+  },
+});
 export const TAMANHO_PAGINA = 30;
 export const historicoQuery = (userId: string, mes: string) => infiniteQueryOptions({
   queryKey: ['rdo', userId, 'historico', mes], initialPageParam: 0,

@@ -58,6 +58,10 @@
   --input: oklch(0.86 0.01 250);
   --ring: oklch(0.7 0.17 55);
   --navy: oklch(0.26 0.07 255);
+  --grafico-barra: #2a78d6;
+  --grafico-grade: #e4e3df;
+  --grafico-texto: #52514e;
+  --grafico-cursor: rgb(42 120 214 / 0.08);
   --navy-foreground: oklch(0.97 0.005 80);
   --safety: oklch(0.7 0.18 52);
   --safety-foreground: oklch(0.2 0.04 255);
@@ -95,3 +99,4 @@
   .avoid-break { break-inside: avoid; }
 }
 .print-only { display: none; }
+.print-only.medindo { display: block; position: absolute; left: -10000px; top: 0; width: 190mm; visibility: hidden; }
