@@ -10,7 +10,7 @@ const atividade = (id: string, frente_id: string, descricao: string) => ({ id, f
 const anotacao = (tipo: string, texto: string) => ({ id: texto, tipo, texto }) as AnotacaoBanco;
 const linha = (id: string, funcao: string, categoria: string, quantidade: number) => ({ id, funcao, categoria, quantidade }) as MaoObraBanco;
 function montar(extra: Partial<DocumentoRdo> = {}) {
-  const doc: DocumentoRdo = { rdo, obra: { nome: 'Ponte Sul' } as DocumentoRdo['obra'], frentes, urls: {}, logoUrl: null, assinaturaUrl: null, maoObra: [], equipamentos: [], atividades: [], anotacoes: [], fotos: [], ...extra };
+  const doc: DocumentoRdo = { rdo, obra: { nome: 'Ponte Sul' } as DocumentoRdo['obra'], frentes, logoUrl: null, assinaturaUrl: null, maoObra: [], equipamentos: [], atividades: [], anotacoes: [], fotos: [], ...extra };
   const { container } = render(<PrintView doc={doc} />);
   const pdf = container.querySelector('.print-only') as HTMLElement;
   return { pdf, titulos: Array.from(pdf.querySelectorAll('[data-secao]')).map(t => t.textContent) };
@@ -108,16 +108,12 @@ describe('PDF do RDO360', () => {
     expect(pdf.textContent).not.toContain('Ocorrências / observações gerais');
     expect(pdf.textContent).toContain('DDS realizado');
   });
-  it('fotos desmarcadas somem; marcadas vão para uma folha anexa, e assinaturas ficam no item 7', () => {
+  it('não leva fotos para o PDF, e assinaturas ficam no item 7', () => {
     const fotos = [{ id: 'f', storage_path: 'rdo/f.jpg', legenda: 'Vista' }] as FotoBanco[];
-    const sem = montar({ rdo: { ...rdo, fotos_no_pdf: false }, fotos });
-    expect(sem.titulos).toContain('7. Assinaturas');
-    expect(sem.titulos.some(t => t?.includes('Registro fotográfico'))).toBe(false);
-    cleanup();
-    const com = montar({ fotos, urls: { 'rdo/f.jpg': 'https://exemplo/f.jpg' } });
-    expect(com.titulos).toEqual(['1. Dados da obra', '2. Condições climáticas · Horário: 07:00 às 17:00', '3. Mão de obra · Efetivo total 0', '4. Equipamentos · Total 0', '5. Atividades executadas', '6. Ocorrências e observações', '7. Assinaturas', 'Registro fotográfico · Anexo do RDO Nº 1004 · 29/10/2026']);
-    expect(com.pdf.querySelector('[data-folha]')?.textContent).not.toContain('Registro fotográfico');
-    expect(com.pdf.querySelector('img')?.getAttribute('src')).toBe('https://exemplo/f.jpg');
+    const { pdf, titulos } = montar({ fotos });
+    expect(titulos[titulos.length - 1]).toBe('7. Assinaturas');
+    expect(pdf.textContent).not.toContain('Registro fotográfico');
+    expect(pdf.querySelector('img')).toBeNull();
   });
   it('resume o efetivo na ordem indireto, direto, terceirizado', () => {
     const { titulos } = montar({ maoObra: [linha('a', 'Pedreiro', 'direto', 6), linha('b', 'Engenheiro', 'indireto', 1), linha('c', 'Eletricista', 'terceirizado', 2)] });

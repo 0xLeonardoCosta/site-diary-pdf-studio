@@ -113,6 +113,13 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
 57. Total de máquinas no título de Equipamentos.
 58. Fotos marcadas para o PDF saem numa folha anexa, depois da página do RDO.
 
+### 1.13 PDF no Layout Excel (09/11/2026)
+
+59. Ao exportar, uma caixa pergunta o layout: "Layout Atual" (o PDF em página única) ou "Layout Excel". Vale para o RDO do dia e para a exportação em lote do Histórico.
+60. Layout Excel: a planilha do contrato em duas páginas A4, com linhas e colunas nas medidas do modelo. A página 1 traz os dados da obra, o clima e a mão de obra e os equipamentos. A página 2 traz os serviços executados, as observações e as assinaturas.
+61. As funções e os equipamentos da planilha saem sempre, com 0 quando não há lançamento. Grafias diferentes do mesmo nome são reconhecidas, como "Gredista" e "Greidista". O que não consta na planilha vai para as linhas em branco do bloco.
+62. Fotos deixam de ir para o PDF, nos dois layouts. A opção "Incluir no PDF" saiu do Registro fotográfico, e as fotos continuam só no site.
+
 ---
 
 ## 2. Funções atuais
@@ -144,7 +151,7 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
   - **4. Equipamentos:** descrição e quantidade.
   - **5. Atividades executadas:** local e descrição, com sugestões de atividades já usadas naquela frente.
   - **6. Ocorrências e observações:** gerais e de segurança do trabalho, com uma anotação por autor.
-  - **7. Registro fotográfico:** até 20 fotos com legenda, e opção de incluir no PDF.
+  - **7. Registro fotográfico:** até 20 fotos com legenda. As fotos ficam só no site e não vão para o PDF.
   - **8. Assinaturas:** Contratada e Gerenciadora, e o botão de assinar.
 
 ### Rascunhos antigos
@@ -170,14 +177,35 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
 
 ### PDF
 
-- Gerado pela janela de impressão do navegador. Cada RDO ocupa exatamente uma página A4.
+- Gerado pela janela de impressão do navegador. Ao exportar, escolhe-se o layout: "Layout Atual" ou "Layout Excel". Nenhum dos dois inclui fotos.
+
+**Layout Atual**
+
+- Cada RDO ocupa exatamente uma página A4.
 - Cabeçalho com logo, nome da obra, número, data e dia da semana.
 - Seções: 1. Dados da obra, 2. Condições climáticas, 3. Mão de obra (efetivo total no título), 4. Equipamentos (total de máquinas no título), 5. Atividades executadas, 6. Ocorrências e observações e 7. Assinaturas.
 - Mão de obra em quatro colunas, com "(cont.)" quando a categoria continua na coluna seguinte. Listas curtas ficam em menos colunas.
 - Atividades agrupadas por frente, com a quantidade de serviços no título do grupo, em duas colunas.
 - Atividades e ocorrências crescem para ocupar o espaço livre: a página fica cheia mesmo com poucos lançamentos. Quando o conteúdo passa de uma página, tudo é reduzido proporcionalmente até caber.
-- Fotos marcadas saem numa folha anexa, logo depois da página do RDO. Fotos desmarcadas não aparecem.
 - A assinatura sai como imagem sobre a linha da Contratada, sem fundo e com pequena variação de posição entre RDOs.
+
+**Layout Excel**
+
+- Duas páginas A4 por RDO, na grade da planilha do contrato. As colunas e as linhas foram medidas no modelo.
+- **Página 1:**
+  - Cabeçalho: logo, nome da obra, número, data e dia da semana.
+  - Dados da obra.
+  - Condições do tempo, pelos códigos da legenda: 1 para chuva forte, 2 para chuva fraca, 4 para nublado, 6 para tempo bom e 0 sem registro.
+  - Tábua de maré, índice pluviométrico e horário de expediente.
+  - Mão de obra do consórcio e terceirizada, equipamentos, e os totais do consórcio, dos terceirizados, geral e de equipamentos.
+- **Página 2:**
+  - Serviços executados como "serviço - frente", em duas colunas de 16 linhas.
+  - Observações, com ocorrências e segurança do trabalho.
+  - Quadros de registros solicitados, liberações de imóveis e considerações da gerenciadora, em branco para preenchimento.
+  - Assinaturas da Contratada e da Gerenciadora.
+- **Quando falta espaço:**
+  - Com mais lançamentos que linhas, o bloco ganha linhas.
+  - Se a página passar do A4, ela é reduzida até caber.
 
 ### Gráficos
 

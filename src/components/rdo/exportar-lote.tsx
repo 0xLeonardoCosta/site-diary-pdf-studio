@@ -4,14 +4,19 @@ import { FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { MARCA } from '@/lib/marca';
-import { assinaturaUrlQuery, diaQuery, fotosUrlsQuery, frentesQuery, logoUrlQuery, obraQuery } from '@/lib/rdo/queries';
+import { assinaturaUrlQuery, diaQuery, frentesQuery, logoUrlQuery, obraQuery } from '@/lib/rdo/queries';
 import { fmtData, mensagemErro } from '@/lib/rdo/rules';
+import type { LayoutPdf } from '@/lib/rdo/layout-excel';
+import { EscolherLayout } from './escolher-layout';
+import { PrintExcel } from './print-excel';
 import { PrintView, imprimir, type DocumentoRdo } from './print-view';
 
 export function ExportarLote({ userId, datas, children, acoes }: { userId: string; datas: string[]; children: ReactNode; acoes?: ReactNode }) {
   const client = useQueryClient();
   const [documentos, setDocumentos] = useState<DocumentoRdo[]>([]);
   const [progresso, setProgresso] = useState<string | null>(null);
+  const [escolhendo, setEscolhendo] = useState(false);
+  const [layout, setLayout] = useState<LayoutPdf>('atual');
 
   // Prints only after React has rendered the documents. The title becomes the suggested file name.
   useEffect(() => {
@@ -25,7 +30,8 @@ export function ExportarLote({ userId, datas, children, acoes }: { userId: strin
     return () => { window.removeEventListener('afterprint', limpar); document.title = titulo; };
   }, [documentos]);
 
-  async function exportar() {
+  async function exportar(escolhido: LayoutPdf) {
+    setLayout(escolhido);
     const ordenadas = [...datas].sort();
     try {
       const [obra, frentes] = await Promise.all([client.fetchQuery(obraQuery(userId)), client.fetchQuery(frentesQuery(userId))]);
@@ -35,10 +41,8 @@ export function ExportarLote({ userId, datas, children, acoes }: { userId: strin
         setProgresso(`Preparando ${i + 1} de ${ordenadas.length}…`);
         const dia = await client.fetchQuery(diaQuery(userId, data));
         if (!dia.rdo) throw new Error(`O RDO de ${fmtData(data)} não está mais disponível.`);
-        const caminhos = dia.rdo.fotos_no_pdf ? dia.fotos.map(f => f.storage_path) : [];
-        const urls = caminhos.length ? await client.fetchQuery(fotosUrlsQuery(userId, caminhos)) : {};
         const assinaturaUrl = dia.rdo.assinatura_path ? await client.fetchQuery(assinaturaUrlQuery(userId, dia.rdo.assinatura_path)) : null;
-        prontos.push({ ...dia, rdo: dia.rdo, obra, frentes, urls, logoUrl, assinaturaUrl });
+        prontos.push({ ...dia, rdo: dia.rdo, obra, frentes, logoUrl, assinaturaUrl });
       }
       setDocumentos(prontos);
     } catch (error) { toast.error(mensagemErro(error)); }
@@ -51,11 +55,14 @@ export function ExportarLote({ userId, datas, children, acoes }: { userId: strin
           {children}
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {acoes}
-            <Button disabled={!datas.length || progresso !== null} onClick={() => void exportar()}><FileDown />{progresso ?? 'Gerar PDF dos RDOs selecionados'}</Button>
+            <Button disabled={!datas.length || progresso !== null} onClick={() => setEscolhendo(true)}><FileDown />{progresso ?? 'Gerar PDF dos RDOs selecionados'}</Button>
           </div>
         </div>
       </div>
-      {documentos.map((doc, i) => <PrintView key={doc.rdo.id} doc={doc} novaPagina={i > 0} />)}
+      <EscolherLayout aberto={escolhendo} aoFechar={() => setEscolhendo(false)} aoEscolher={l => void exportar(l)} />
+      {documentos.map((doc, i) => layout === 'excel'
+        ? <PrintExcel key={doc.rdo.id} doc={doc} novaPagina={i > 0} />
+        : <PrintView key={doc.rdo.id} doc={doc} novaPagina={i > 0} />)}
     </>
   );
 }

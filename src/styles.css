@@ -102,3 +102,40 @@
 .print-only.medindo { display: block; position: absolute; left: -10000px; top: 0; width: 190mm; visibility: hidden; }
 /* Natural height of the RDO page, before it is stretched to A4 or scaled down to fit. */
 .print-only.medindo [data-folha] { height: auto !important; }
+
+/* Layout Excel: the contract spreadsheet, measured in points on its PDF. Its sheets print on a
+   margin-free A4 page and place the grid themselves, centred, 32 pt from the top. */
+@media print {
+  @page excel { size: A4; margin: 0; }
+  /* Changing page type forces a break, so the whole printout uses the Excel page. */
+  html:has(.print-only.excel), html:has(.print-only.excel) body { page: excel; }
+}
+
+.folha-excel { width: 210mm; height: 296mm; box-sizing: border-box; padding-top: 32.3pt; display: flex; justify-content: center; align-items: flex-start; overflow: hidden; }
+.folha-excel + .folha-excel { break-before: page; }
+.excel { font-family: Arial, Helvetica, sans-serif; font-size: 6.2pt; line-height: 1.15; color: #000; }
+.excel table { width: 555.7pt; table-layout: fixed; border-collapse: collapse; border: 1.2pt solid #000; }
+.excel td { border: 0.5pt solid #000; padding: 0 1.5pt; text-align: center; vertical-align: middle; overflow: hidden; overflow-wrap: anywhere; }
+.excel tr.grossa > td { border-top-width: 1.2pt; }
+.excel td.esq { text-align: left; }
+.excel td.b { font-weight: 700; }
+.excel td.sem-topo { border-top-color: transparent; }
+.excel td.sem-base { border-bottom-color: transparent; }
+.excel td.sem-dir { border-right-color: transparent; }
+.excel td.sem-esq { border-left-color: transparent; }
+.excel td.legenda { padding-left: 24pt; }
+.excel td.cinza { background: #a5a5a5; }
+.excel td.claro { background: #d8d8d8; }
+.excel td.titulo { font-size: 9pt; line-height: 1.12; }
+.excel td.numero { font-size: 10pt; }
+.excel td.dia { font-size: 6.8pt; }
+.excel td.contrato { font-size: 7pt; text-decoration: underline; }
+.excel td.secao { font-size: 7.4pt; }
+.excel td.servico { font-size: 6.8pt; }
+.excel td.liberacoes { font-size: 6.8pt; }
+.excel td.observacoes { font-size: 6.8pt; line-height: 1.25; vertical-align: top; padding-top: 2pt; white-space: pre-wrap; }
+.excel td.observacoes p { margin: 0; }
+.excel td.assinatura { position: relative; vertical-align: bottom; padding-bottom: 1.5pt; }
+.excel td.assinatura img { position: absolute; left: 50%; bottom: 7pt; max-height: 34pt; max-width: 70%; transform: translateX(-50%); mix-blend-mode: multiply; }
+.excel td.assinatura span { position: relative; font-weight: 700; }
+.excel img.logo { display: block; margin: 0 auto; max-height: 36pt; max-width: 118pt; object-fit: contain; }

@@ -4,7 +4,7 @@ import { posicaoAssinatura } from "@/lib/rdo/assinatura";
 import type { DiaRdo, FrenteBanco, ObraBanco, RdoBanco } from "@/lib/rdo/queries";
 import { CATEGORIAS, COLETAS, ROTULOS, TURNOS, climaIcone, diaSemana, distribuirColunas, entradasServicos, fmtData, paginarServicos, numeroParaTexto, ordenarPorFrente, totalCategoria, totalEfetivo, type TrechoServicos } from "@/lib/rdo/rules";
 
-export type DocumentoRdo = Omit<DiaRdo, "rdo"> & { rdo: RdoBanco; obra: ObraBanco; frentes: FrenteBanco[]; urls: Record<string, string>; logoUrl: string | null; assinaturaUrl: string | null };
+export type DocumentoRdo = Omit<DiaRdo, "rdo"> & { rdo: RdoBanco; obra: ObraBanco; frentes: FrenteBanco[]; logoUrl: string | null; assinaturaUrl: string | null };
 
 const fmt = (d: string | null) => (d ? fmtData(d) : "—");
 const mareTxt = (r: RdoBanco) =>
@@ -54,7 +54,7 @@ const PAUTA = {
 
 // The RDO is one A4 page (277 mm inside the print margins). Printing asks every document to measure
 // its natural height first; content taller than the page is scaled down to fit it.
-const EVENTO_PAGINAR = "rdo360:paginar";
+export const EVENTO_PAGINAR = "rdo360:paginar";
 const ESCALA_MINIMA = 0.55;
 function medirEscala(raiz: HTMLElement): number {
   const folha = raiz.querySelector<HTMLElement>("[data-folha]");
@@ -81,13 +81,12 @@ function medirEscala(raiz: HTMLElement): number {
   }
 }
 export function PrintView({ doc, novaPagina }: { doc: DocumentoRdo; novaPagina?: boolean }) {
-  const { rdo: r, obra, maoObra, frentes, urls } = doc;
+  const { rdo: r, obra, maoObra, frentes } = doc;
   const total = totalEfetivo(maoObra);
   const totalEquipamentos = doc.equipamentos.reduce((n, e) => n + e.quantidade, 0);
   const atividades = ordenarPorFrente(doc.atividades, frentes);
   const textos = (tipo: string) => doc.anotacoes.filter((a) => a.tipo === tipo && a.texto.trim()).map((a) => a.texto.trim());
   const ocorrencias = textos("ocorrencia"), seguranca = textos("seguranca");
-  const fotos = r.fotos_no_pdf ? doc.fotos : [];
   const nomeFrente = (id: string) => frentes.find((f) => f.id === id)?.nome ?? "Sem local";
   const raiz = useRef<HTMLDivElement>(null);
   const [escala, setEscala] = useState(1);
@@ -220,27 +219,11 @@ export function PrintView({ doc, novaPagina }: { doc: DocumentoRdo; novaPagina?:
         </div>
       </div>
 
-      {/* Photos do not fit the single page: they follow on their own sheet, as an annex of this RDO. */}
-      {fotos.length > 0 && (
-        <div className="break-before-page">
-          <div data-secao className="mb-2 border-l-4 border-safety bg-navy px-2 py-[3px] text-[10px] font-bold uppercase tracking-wide text-navy-foreground">
-            Registro fotográfico<span className="text-[8.5px] font-medium tracking-wider opacity-80"> · Anexo do RDO Nº {r.numero} · {fmtData(r.data)}</span>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {fotos.map((f, i) => (
-              <figure key={f.id} className="avoid-break overflow-hidden rounded border">
-                <img src={urls[f.storage_path]} alt={f.legenda ?? ""} className="aspect-[4/3] w-full object-cover" />
-                <figcaption className="px-1.5 py-1 text-[9px]"><b>Foto {i + 1}.</b> {f.legenda}</figcaption>
-              </figure>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-// Signed photo URLs load asynchronously; printing earlier would leave blank frames in the PDF.
+// Images (logo and signature) load asynchronously; printing earlier would leave blank frames in the PDF.
 export async function imprimir() {
   window.dispatchEvent(new Event(EVENTO_PAGINAR));
   // Let React render the measured layout before the print snapshot.

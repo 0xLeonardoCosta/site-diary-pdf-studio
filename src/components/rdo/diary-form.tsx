@@ -1,15 +1,18 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { MaoObra } from "./labor";
 import { Anotacoes, Atividades, Equipamentos, Fotos } from "./lancamentos";
 import { AssinarRdo } from "./assinar-rdo";
 import { ImportarRascunho } from "./importar-rascunho";
+import { EscolherLayout } from "./escolher-layout";
+import { PrintExcel } from "./print-excel";
 import { LogoObra, PrintView, imprimir } from "./print-view";
 import { usePermissao } from "@/components/auth-context";
 import { Button } from "@/components/ui/button";
 import { useCampo } from "@/hooks/use-campo";
 import type { Permissao } from "@/lib/auth-rules";
 import { MARCA } from "@/lib/marca";
+import type { LayoutPdf } from "@/lib/rdo/layout-excel";
 import { alterarDia, assinaturaUrlQuery, fotosUrlsQuery, frentesQuery, logoUrlQuery, obraQuery, type DiaRdo, type FrenteBanco, type RdoBanco } from "@/lib/rdo/queries";
 import { CLIMAS, COLETAS, TURNOS, climaIcone, diaSemana, fmtData, numeroParaTexto, rdoEditavel, textoParaNumero } from "@/lib/rdo/rules";
 import { salvarCampo } from "@/lib/rdo/salvar";
@@ -26,6 +29,10 @@ export function DiaryForm({ date, dia, userId, numero }: { date: string; dia: Di
   const sincronia = useSincronia();
   const { rdo } = dia;
   const assinaturaUrl = useQuery(assinaturaUrlQuery(userId, rdo?.assinatura_path ?? null)).data ?? null;
+  const [escolhendo, setEscolhendo] = useState(false);
+  // Each request renders the chosen layout first; the effect prints once it is on the page.
+  const [pedido, setPedido] = useState<{ layout: LayoutPdf; vez: number }>({ layout: "atual", vez: 0 });
+  useEffect(() => { if (pedido.vez) void imprimir(); }, [pedido]);
 
   // Closing the tab would drop whatever is still debouncing.
   useEffect(() => {
@@ -60,14 +67,17 @@ export function DiaryForm({ date, dia, userId, numero }: { date: string; dia: Di
         <div className="fixed inset-x-0 bottom-0 border-t bg-card/95 backdrop-blur">
           <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3">
             <span role="status" className={`w-28 shrink-0 text-sm font-semibold ${sincronia === "erro" ? "text-destructive" : "text-muted-foreground"}`}>{STATUS[sincronia]}</span>
-            <Button disabled={!exportar || !rdo || sincronia === "salvando"} onClick={() => void imprimir()} className="flex-1 rounded-md bg-safety px-4 py-3 font-display text-lg font-bold uppercase text-safety-foreground shadow-lg hover:brightness-105">
+            <Button disabled={!exportar || !rdo || sincronia === "salvando"} onClick={() => setEscolhendo(true)} className="flex-1 rounded-md bg-safety px-4 py-3 font-display text-lg font-bold uppercase text-safety-foreground shadow-lg hover:brightness-105">
               Exportar PDF
             </Button>
           </div>
         </div>
       </div>
 
-      {exportar && rdo && <PrintView doc={{ ...dia, rdo, obra, frentes, urls, logoUrl, assinaturaUrl }} />}
+      <EscolherLayout aberto={escolhendo} aoFechar={() => setEscolhendo(false)} aoEscolher={(layout) => setPedido((p) => ({ layout, vez: p.vez + 1 }))} />
+      {exportar && rdo && (pedido.layout === "excel"
+        ? <PrintExcel doc={{ ...dia, rdo, obra, frentes, logoUrl, assinaturaUrl }} />
+        : <PrintView doc={{ ...dia, rdo, obra, frentes, logoUrl, assinaturaUrl }} />)}
     </>
   );
 }
@@ -125,7 +135,7 @@ function SecoesDoDia({ rdo, dia, date, userId, frentes, urls, assinaturaUrl }: P
         </div>
       </Section>
 
-      <Section permissao="lancar_atividades" travado={travado} n="7" title={`Registro fotográfico · ${dia.fotos.length}`} extra={<FotosNoPdf {...campo} />}>
+      <Section permissao="lancar_atividades" travado={travado} n="7" title={`Registro fotográfico · ${dia.fotos.length}`}>
         <Fotos linhas={dia.fotos} urls={urls} ctx={ctx} />
       </Section>
 
@@ -187,20 +197,6 @@ function TurnoClima({ turno, ...campo }: PropsCampo & { turno: (typeof TURNOS)[n
     </div>
   );
 }
-function FotosNoPdf(campo: PropsCampo) {
-  const gravar = useGravarRdo(campo);
-  const c = useCampo(campo.rdo.fotos_no_pdf, async (novo, base) => {
-    await gravar("fotos_no_pdf", base, novo);
-    return novo;
-  }, { atraso: 0 });
-  return (
-    <label className="flex cursor-pointer items-center gap-2 font-sans text-sm font-semibold normal-case text-foreground">
-      <input type="checkbox" className="size-4 accent-safety" checked={c.valor} onChange={(e) => c.alterar(e.target.checked)} />
-      Incluir no PDF
-    </label>
-  );
-}
-
 function Section({ n, title, children, permissao, extra, travado, rodape }: { n?: string; title: string; children: ReactNode; permissao?: Permissao; extra?: ReactNode; travado?: boolean; rodape?: ReactNode }) {
   const permitido = usePermissao(permissao ?? "editar_obra");
   const bloqueado = Boolean((permissao && !permitido) || travado);

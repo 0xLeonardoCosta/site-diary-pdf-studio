@@ -92,6 +92,9 @@ describe('Exportação em lote', () => {
     const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
     const { container } = render(comQuery(<ExportarLote userId="u" datas={['2026-10-28', '2026-10-27']}>x</ExportarLote>));
     fireEvent.click(screen.getByRole('button', { name: /Gerar PDF/ }));
+    expect(screen.getByRole('dialog', { name: 'Qual layout deseja exportar?' })).toBeTruthy();
+    expect(imprimir).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /Layout Atual/ }));
     await waitFor(() => expect(imprimir).toHaveBeenCalledTimes(1));
     const docs = Array.from(container.querySelectorAll('.print-only'));
     expect(docs.map(d => d.querySelector('.text-2xl')?.textContent)).toEqual(['RDO Nº 1002', 'RDO Nº 1003']);
@@ -100,6 +103,28 @@ describe('Exportação em lote', () => {
     expect(document.title).toContain('RDOs 1002 a 1003');
     await act(async () => { window.dispatchEvent(new Event('afterprint')); });
     expect(container.querySelectorAll('.print-only')).toHaveLength(0);
+  });
+  it('no Layout Excel cada RDO sai em duas folhas da planilha', async () => {
+    mock.dias['2026-10-28'] = dia(1003, '2026-10-28');
+    mock.dias['2026-10-27'] = dia(1002, '2026-10-27');
+    const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    const { container } = render(comQuery(<ExportarLote userId="u" datas={['2026-10-28', '2026-10-27']}>x</ExportarLote>));
+    fireEvent.click(screen.getByRole('button', { name: /Gerar PDF/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Layout Excel/ }));
+    await waitFor(() => expect(imprimir).toHaveBeenCalledTimes(1));
+    const docs = Array.from(container.querySelectorAll('.print-only.excel'));
+    expect(docs).toHaveLength(2);
+    expect(docs.map(d => d.querySelectorAll('.folha-excel').length)).toEqual([2, 2]);
+    expect(docs.map(d => d.querySelector('.numero')?.textContent)).toEqual(['1002', '1003']);
+    expect(docs[1]?.className).toContain('break-before-page');
+  });
+  it('fechar a caixa sem escolher não gera o PDF', async () => {
+    const imprimir = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    render(comQuery(<ExportarLote userId="u" datas={['2026-10-28']}>x</ExportarLote>));
+    fireEvent.click(screen.getByRole('button', { name: /Gerar PDF/ }));
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(imprimir).not.toHaveBeenCalled();
   });
   it('sem seleção o botão fica desativado', () => {
     render(comQuery(<ExportarLote userId="u" datas={[]}>x</ExportarLote>));
