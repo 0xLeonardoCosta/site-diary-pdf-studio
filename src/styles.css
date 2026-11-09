@@ -100,3 +100,5 @@
 }
 .print-only { display: none; }
 .print-only.medindo { display: block; position: absolute; left: -10000px; top: 0; width: 190mm; visibility: hidden; }
+/* Natural height of the RDO page, before it is stretched to A4 or scaled down to fit. */
+.print-only.medindo [data-folha] { height: auto !important; }

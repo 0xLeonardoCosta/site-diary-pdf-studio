@@ -13,7 +13,7 @@ function montar(extra: Partial<DocumentoRdo> = {}) {
   const doc: DocumentoRdo = { rdo, obra: { nome: 'Ponte Sul' } as DocumentoRdo['obra'], frentes, urls: {}, logoUrl: null, assinaturaUrl: null, maoObra: [], equipamentos: [], atividades: [], anotacoes: [], fotos: [], ...extra };
   const { container } = render(<PrintView doc={doc} />);
   const pdf = container.querySelector('.print-only') as HTMLElement;
-  return { pdf, titulos: Array.from(pdf.querySelectorAll('.font-display.text-sm')).map(t => t.textContent) };
+  return { pdf, titulos: Array.from(pdf.querySelectorAll('[data-secao]')).map(t => t.textContent) };
 }
 afterEach(cleanup);
 
@@ -28,10 +28,10 @@ describe('Cabeçalho e dados da obra', () => {
     expect(pdf.textContent).toContain('30/09/2026');
   });
   it('reduz a fonte de nomes longos e mantém a de nomes curtos', () => {
-    const titulo = (pdf: HTMLElement) => pdf.querySelector('.uppercase.font-display.font-bold') as HTMLElement;
-    expect(titulo(montar({ obra }).pdf).className).toContain('text-[13px]');
+    const titulo = (pdf: HTMLElement) => pdf.querySelector('.uppercase.text-navy.font-bold') as HTMLElement;
+    expect(titulo(montar({ obra }).pdf).className).toContain('text-[12.5px]');
     cleanup();
-    expect(titulo(montar({ obra: { ...obra, nome: 'Ponte Sul' } }).pdf).className).toContain('text-2xl');
+    expect(titulo(montar({ obra: { ...obra, nome: 'Ponte Sul' } }).pdf).className).toContain('text-xl');
   });
   it('mostra a logo só quando existe', () => {
     expect(montar({ obra }).pdf.querySelector('img')).toBeNull();
@@ -70,7 +70,7 @@ describe('Atividades e observações no PDF', () => {
     const { pdf } = montar({ atividades: [atividade('3', 'murutucu', 'Dragagem'), atividade('1', 'canteiro', 'Forma'), atividade('2', 'canteiro', 'Armação')] });
     const lista = pdf.querySelector('[data-servicos]') as HTMLElement;
     const linhas = Array.from(lista.querySelectorAll('.bg-muted, .border-dotted')).map(e => e.textContent);
-    expect(linhas).toEqual(['Canteiro2', '•Forma', '•Armação', 'Murutucu1', '•Dragagem']);
+    expect(linhas).toEqual(['Canteiro2', 'Forma', 'Armação', 'Murutucu1', 'Dragagem']);
     expect(lista.querySelector('table')).toBeNull();
   });
   it('observações no item 6, sem o subtítulo das gerais', () => {
@@ -90,12 +90,12 @@ describe('Atividades e observações no PDF', () => {
 describe('PDF do RDO360', () => {
   it('usa a marca, a lua na noite anterior e a ordem das frentes', () => {
     const { pdf } = montar({ atividades: [atividade('1', 'murutucu', 'Forma'), atividade('2', 'canteiro', 'Limpeza')] });
-    expect(pdf.textContent).toContain('RDO360 – Diário de obra:');
+    expect(pdf.textContent).toContain('RDO360 – Diário de obra');
     expect(pdf.textContent).toContain('Ponte Sul');
     expect(pdf.textContent).toContain('🌙 Bom');
-    expect(pdf.textContent).toContain('Precipitação (mm)');
+    expect(pdf.textContent).toContain('Precipitação 07:00');
     expect(pdf.textContent).not.toContain('Pluvi');
-    expect(pdf.textContent).toContain('1,5');
+    expect(pdf.textContent).toContain('1,5 mm');
     const frentes = Array.from(pdf.querySelectorAll('[data-servicos] .bg-muted span:first-child')).map(e => e.textContent);
     expect(frentes).toEqual(['Canteiro', 'Murutucu']);
   });
@@ -108,18 +108,43 @@ describe('PDF do RDO360', () => {
     expect(pdf.textContent).not.toContain('Ocorrências / observações gerais');
     expect(pdf.textContent).toContain('DDS realizado');
   });
-  it('fotos desmarcadas somem e assinaturas viram o item 7', () => {
+  it('fotos desmarcadas somem; marcadas vão para uma folha anexa, e assinaturas ficam no item 7', () => {
     const fotos = [{ id: 'f', storage_path: 'rdo/f.jpg', legenda: 'Vista' }] as FotoBanco[];
     const sem = montar({ rdo: { ...rdo, fotos_no_pdf: false }, fotos });
     expect(sem.titulos).toContain('7. Assinaturas');
     expect(sem.titulos.some(t => t?.includes('Registro fotográfico'))).toBe(false);
     cleanup();
     const com = montar({ fotos, urls: { 'rdo/f.jpg': 'https://exemplo/f.jpg' } });
-    expect(com.titulos).toEqual(expect.arrayContaining(['7. Registro fotográfico', '8. Assinaturas']));
+    expect(com.titulos).toEqual(['1. Dados da obra', '2. Condições climáticas · Horário: 07:00 às 17:00', '3. Mão de obra · Efetivo total 0', '4. Equipamentos · Total 0', '5. Atividades executadas', '6. Ocorrências e observações', '7. Assinaturas', 'Registro fotográfico · Anexo do RDO Nº 1004 · 29/10/2026']);
+    expect(com.pdf.querySelector('[data-folha]')?.textContent).not.toContain('Registro fotográfico');
     expect(com.pdf.querySelector('img')?.getAttribute('src')).toBe('https://exemplo/f.jpg');
   });
   it('resume o efetivo na ordem indireto, direto, terceirizado', () => {
     const { titulos } = montar({ maoObra: [linha('a', 'Pedreiro', 'direto', 6), linha('b', 'Engenheiro', 'indireto', 1), linha('c', 'Eletricista', 'terceirizado', 2)] });
     expect(titulos).toContain('3. Mão de obra · Efetivo total 9');
+  });
+  it('equipamentos mostram o total de máquinas no título', () => {
+    const equipamentos = [{ id: 'e1', descricao: 'Escavadeira', quantidade: 3 }, { id: 'e2', descricao: 'Munck', quantidade: 1 }] as DocumentoRdo['equipamentos'];
+    expect(montar({ equipamentos }).titulos).toContain('4. Equipamentos · Total 4');
+  });
+  it('efetivo grande vira 4 colunas, e a categoria cortada repete o título como continuação', () => {
+    const maoObra = [...Array.from({ length: 22 }, (_, i) => linha(`i${i}`, `Indireto ${i}`, 'indireto', 1)), ...Array.from({ length: 19 }, (_, i) => linha(`d${i}`, `Direto ${i}`, 'direto', 1)), ...Array.from({ length: 11 }, (_, i) => linha(`t${i}`, `Terc ${i}`, 'terceirizado', 1))];
+    const { pdf } = montar({ maoObra });
+    const colunas = Array.from(pdf.querySelectorAll('.grid-cols-4 > div'));
+    expect(colunas).toHaveLength(4);
+    expect(pdf.textContent).toContain('Indireto (cont.)');
+    expect(colunas[0]?.querySelector('.bg-muted')?.textContent).toBe('Indireto22');
+  });
+  it('poucas funções ficam numa coluna só, sem continuação', () => {
+    const { pdf } = montar({ maoObra: [linha('a', 'Pedreiro', 'direto', 6), linha('b', 'Engenheiro', 'indireto', 1)] });
+    expect(pdf.querySelectorAll('.grid-cols-4 > div')).toHaveLength(1);
+    expect(pdf.textContent).not.toContain('(cont.)');
+  });
+  it('a folha tem a altura de uma página A4 e as seções 5 e 6 crescem para ocupá-la', () => {
+    const { pdf } = montar();
+    const folha = pdf.querySelector('[data-folha]') as HTMLElement;
+    expect(folha.style.height).toBe('calc(277mm / 1)');
+    expect(folha.innerHTML).toContain('flex-[3_1_auto]');
+    expect(folha.innerHTML).toContain('flex-[2_1_auto]');
   });
 });

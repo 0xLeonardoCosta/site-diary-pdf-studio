@@ -94,7 +94,7 @@ describe('Exportação em lote', () => {
     fireEvent.click(screen.getByRole('button', { name: /Gerar PDF/ }));
     await waitFor(() => expect(imprimir).toHaveBeenCalledTimes(1));
     const docs = Array.from(container.querySelectorAll('.print-only'));
-    expect(docs.map(d => d.querySelector('.text-xl')?.textContent)).toEqual(['RDO Nº 1002', 'RDO Nº 1003']);
+    expect(docs.map(d => d.querySelector('.text-2xl')?.textContent)).toEqual(['RDO Nº 1002', 'RDO Nº 1003']);
     expect(docs[0]?.className).not.toContain('break-before-page');
     expect(docs[1]?.className).toContain('break-before-page');
     expect(document.title).toContain('RDOs 1002 a 1003');

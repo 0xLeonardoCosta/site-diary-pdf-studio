@@ -106,6 +106,13 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
 53. Efetivo diário somado no próprio banco, numa única consulta, em vez de baixar todas as linhas de mão de obra.
 54. Cronograma desenha uma barra por trecho de dias seguidos, o que mantém "Todo o período" leve com o histórico inteiro.
 
+### 1.12 PDF em página única (09/11/2026)
+
+55. Cada RDO sai em uma única página A4, no layout do modelo enviado. Dias com pouca informação ocupam a página inteira, com linhas em branco nas atividades e o quadro de ocorrências ampliado. Dias com muita informação são reduzidos até caber.
+56. Mão de obra em quatro colunas equilibradas, com "(cont.)" quando uma categoria continua na coluna seguinte.
+57. Total de máquinas no título de Equipamentos.
+58. Fotos marcadas para o PDF saem numa folha anexa, depois da página do RDO.
+
 ---
 
 ## 2. Funções atuais
@@ -163,12 +170,13 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
 
 ### PDF
 
-- Gerado pela janela de impressão do navegador, em A4.
+- Gerado pela janela de impressão do navegador. Cada RDO ocupa exatamente uma página A4.
 - Cabeçalho com logo, nome da obra, número, data e dia da semana.
-- Item 1 com os dados da obra, e seções numeradas.
-- Mão de obra em colunas por categoria, com o efetivo total no título.
-- Atividades agrupadas por frente, com a quantidade de serviços no título do grupo, em duas colunas lidas de cima para baixo e da esquerda para a direita.
-- Item 6 com as ocorrências gerais direto sob o título e a segurança do trabalho com subtítulo. Fotos desmarcadas não aparecem.
+- Seções: 1. Dados da obra, 2. Condições climáticas, 3. Mão de obra (efetivo total no título), 4. Equipamentos (total de máquinas no título), 5. Atividades executadas, 6. Ocorrências e observações e 7. Assinaturas.
+- Mão de obra em quatro colunas, com "(cont.)" quando a categoria continua na coluna seguinte. Listas curtas ficam em menos colunas.
+- Atividades agrupadas por frente, com a quantidade de serviços no título do grupo, em duas colunas.
+- Atividades e ocorrências crescem para ocupar o espaço livre: a página fica cheia mesmo com poucos lançamentos. Quando o conteúdo passa de uma página, tudo é reduzido proporcionalmente até caber.
+- Fotos marcadas saem numa folha anexa, logo depois da página do RDO. Fotos desmarcadas não aparecem.
 - A assinatura sai como imagem sobre a linha da Contratada, sem fundo e com pequena variação de posição entre RDOs.
 
 ### Gráficos

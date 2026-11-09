@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { numeroParaData, dataParaNumero, somaDias, hojeLocal, dataValida, numeroValido, quantidadeValida, normalizarFuncao, totalCategoria, totalEfetivo, podeEditarMaoObra, chaveLocal, CATEGORIAS, climaIcone, entradasServicos, paginarServicos, numeroParaTexto, ordenarPorFrente, podeEditarLinha, rdoEditavel, textoParaNumero } from '@/lib/rdo/rules';
+import { numeroParaData, dataParaNumero, somaDias, hojeLocal, dataValida, numeroValido, quantidadeValida, normalizarFuncao, totalCategoria, totalEfetivo, podeEditarMaoObra, chaveLocal, CATEGORIAS, climaIcone, entradasServicos, paginarServicos, distribuirColunas, numeroParaTexto, ordenarPorFrente, podeEditarLinha, rdoEditavel, textoParaNumero } from '@/lib/rdo/rules';
 
 describe('Número e data ligados', () => {
   it.each([[1000, '2026-10-25'], [1002, '2026-10-27'], [1007, '2026-11-01']] as const)('converte referência %i nos dois sentidos', (numero, data) => {
@@ -132,3 +132,23 @@ describe('Serviços do PDF em duas colunas e páginas', () => {
     expect(resumo(bloco!.colunas[1])).toEqual(['a…:4']);
   });
 });
+describe('Efetivo do PDF em colunas', () => {
+  const grupos = (tamanhos: Record<string, number>) => Object.entries(tamanhos).map(([chave, n]) => ({ chave, itens: Array.from({ length: n }, (_, i) => i) }));
+  const resumo = (colunas: ReturnType<typeof distribuirColunas<number>>) => colunas.map(c => c.map(x => (x.tipo === 'grupo' ? `${x.chave}${x.continuacao ? '+' : ''}` : '.')).join(''));
+  it('divide em colunas de altura parecida e repete o título da categoria cortada', () => {
+    const colunas = distribuirColunas(grupos({ i: 22, d: 19, t: 11 }), 4);
+    expect(colunas).toHaveLength(4);
+    expect(colunas.every(c => c.length <= 15)).toBe(true);
+    expect(resumo(colunas)[1]?.startsWith('i+')).toBe(true);
+  });
+  it('nunca termina uma coluna com um título', () => {
+    for (const [a, b] of [[3, 3], [5, 1], [13, 9], [1, 1]]) {
+      for (const coluna of distribuirColunas(grupos({ a: a!, b: b! }), 3)) expect(coluna[coluna.length - 1]?.tipo).toBe('item');
+    }
+  });
+  it('lista curta não se espalha abaixo do mínimo de linhas', () => {
+    expect(resumo(distribuirColunas(grupos({ i: 5, d: 3 }), 4, 10))).toEqual(['i.....d...']);
+    expect(distribuirColunas([], 4)).toEqual([]);
+  });
+});
+

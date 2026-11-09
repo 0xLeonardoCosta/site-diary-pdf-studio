@@ -111,7 +111,40 @@ export function paginarServicos(entradas: EntradaServico[], { disponivel, pagina
   }
   return blocos;
 }
-export const rdoEditavel = (status: string | undefined, fechar: boolean, assinado = false, alterarAssinados = false) => (assinado ? alterarAssinados : status !== 'fechado' || fechar);
+export type CelulaColuna<T> = { tipo: 'grupo'; chave: string; continuacao: boolean } | { tipo: 'item'; chave: string; item: T };
+/**
+ * Spreads labelled groups over `n` columns of nearly equal height, read top to bottom then left to
+ * right. Each heading and item counts as one row, and a column holds at least `minimo` rows, so short
+ * lists stay in fewer columns. A group cut by a column repeats its heading as a continuation, and a
+ * heading never ends a column.
+ */
+export function distribuirColunas<T>(grupos: { chave: string; itens: T[] }[], n: number, minimo = 1): CelulaColuna<T>[][] {
+  const linhas: CelulaColuna<T>[] = grupos.filter(g => g.itens.length).flatMap(g => [
+    { tipo: 'grupo' as const, chave: g.chave, continuacao: false },
+    ...g.itens.map(item => ({ tipo: 'item' as const, chave: g.chave, item })),
+  ]);
+  const montar = (altura: number) => {
+    const colunas: CelulaColuna<T>[][] = [[]];
+    for (const [i, linha] of linhas.entries()) {
+      let atual = colunas[colunas.length - 1]!;
+      // A heading needs room for its first item below it.
+      const precisa = linha.tipo === 'grupo' && i + 1 < linhas.length ? 2 : 1;
+      if (atual.length + precisa > altura && atual.length > 0) {
+        atual = [];
+        colunas.push(atual);
+        if (linha.tipo === 'item') atual.push({ tipo: 'grupo', chave: linha.chave, continuacao: true });
+      }
+      atual.push(linha);
+    }
+    return colunas;
+  };
+  // The shortest height that fits every row in n columns, continuation headings included.
+  for (let altura = Math.max(2, minimo, Math.ceil(linhas.length / n)); ; altura++) {
+    const colunas = montar(altura);
+    if (colunas.length <= n) return colunas.filter(c => c.length);
+  }
+}
+export const rdoEditavel =(status: string | undefined, fechar: boolean, assinado = false, alterarAssinados = false) => (assinado ? alterarAssinados : status !== 'fechado' || fechar);
 export const podeEditarLinha = (criadoPor: string, userId: string, editarDeOutros: boolean) => criadoPor === userId || editarDeOutros;
 export const numeroParaTexto = (n: number | null) => (n === null ? '' : String(n).replace('.', ','));
 export function textoParaNumero(texto: string) {
