@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Cronograma } from '@/components/rdo/cronograma';
@@ -48,10 +49,15 @@ describe('Montagem do cronograma', () => {
   });
 });
 
+function Tela({ abrir = vi.fn() }: { abrir?: (data: string) => void }) {
+  const [periodo, setPeriodo] = useState('2026-11');
+  return <Cronograma meses={['2026-10', '2026-11']} periodo={periodo} aoMudarPeriodo={setPeriodo} dados={{ rdos, atividades }} carregando={false} frentes={frentes} aoAbrirDia={abrir} />;
+}
+
 describe('Tela do cronograma', () => {
   it('mostra detalhes ao passar o mouse e abre o RDO ao clicar', () => {
     const abrir = vi.fn();
-    render(<Cronograma rdos={rdos} atividades={atividades} frentes={frentes} aoAbrirDia={abrir} />);
+    render(<Tela abrir={abrir} />);
     expect(screen.getByRole('combobox', { name: 'Período' })).toHaveValue('2026-11');
     const barra = screen.getByRole('button', { name: 'Corte de armadura, 04/11/2026' });
     fireEvent.mouseEnter(barra);
@@ -59,8 +65,26 @@ describe('Tela do cronograma', () => {
     fireEvent.click(barra);
     expect(abrir).toHaveBeenCalledWith('2026-11-04');
   });
+  it('dias seguidos viram uma única barra, que abre o primeiro dia pelo teclado', () => {
+    const abrir = vi.fn();
+    render(<Tela abrir={abrir} />);
+    const barra = screen.getByRole('button', { name: 'execucao de FORMA, 03/11/2026 a 04/11/2026' });
+    fireEvent.focus(barra);
+    expect(screen.getByText(/03\/11\/2026 \(terça-feira\)/)).toBeInTheDocument();
+    fireEvent.click(barra);
+    expect(abrir).toHaveBeenCalledWith('2026-11-03');
+  });
+  it('todo o período desenha uma barra por trecho, não uma por dia', () => {
+    render(<Tela />);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Período' }), { target: { value: '' } });
+    expect(screen.getAllByRole('button', { name: /^Dragagem/ }).map(b => b.getAttribute('aria-label'))).toEqual(['Dragagem, 30/10/2026', 'Dragagem, 05/11/2026']);
+  });
+  it('mostra carregando enquanto o período não chega', () => {
+    render(<Cronograma meses={['2026-11']} periodo="" aoMudarPeriodo={vi.fn()} dados={undefined} carregando frentes={frentes} aoAbrirDia={vi.fn()} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Carregando atividades de todo o período');
+  });
   it('filtro de frente e busca sem resultado', () => {
-    render(<Cronograma rdos={rdos} atividades={atividades} frentes={frentes} aoAbrirDia={vi.fn()} />);
+    render(<Tela />);
     fireEvent.click(screen.getByRole('button', { name: 'Canteiro' }));
     expect(screen.queryByRole('button', { name: /Dragagem/ })).toBeNull();
     fireEvent.change(screen.getByRole('textbox', { name: 'Buscar atividade' }), { target: { value: 'xyz' } });

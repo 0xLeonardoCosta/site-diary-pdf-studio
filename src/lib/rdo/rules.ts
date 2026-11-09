@@ -15,7 +15,9 @@ export function dataValida(d: string) {
 export const numeroValido = (n: string) => /^-?\d+$/.test(n) && Number.isSafeInteger(Number(n));
 export const quantidadeValida = (n: string) => /^\d+$/.test(n) && Number.isSafeInteger(Number(n)) && Number(n) >= 0;
 export const fmtData = (d: string) => d.split('-').reverse().join('/');
-export const diaSemana = (d: string) => new Date(`${d}T12:00`).toLocaleDateString('pt-BR', { weekday: 'long' });
+const DIAS_SEMANA = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+// A plain lookup: the locale formatter is slow enough to show when a chart labels a thousand days.
+export const diaSemana = (d: string) => DIAS_SEMANA[new Date(`${d}T12:00`).getDay()] ?? '';
 export const CATEGORIAS = ['indireto', 'direto', 'terceirizado'] as const;
 export type Categoria = typeof CATEGORIAS[number];
 export const ROTULOS: Record<Categoria, string> = { direto: 'Direto', indireto: 'Indireto', terceirizado: 'Terceirizado' };

@@ -99,6 +99,13 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
 49. Gráfico de efetivo com as barras divididas em Indireto, Direto e Terceirizado, com legenda, detalhe por categoria e tabela.
 50. Item 1 do PDF na ordem Cliente, Contratada, Fiscalização, Gerenciadora, Local, Contrato nº, Início e Término contratual.
 
+### 1.11 Histórico completo e Gráficos rápidos (09/11/2026)
+
+51. Importação de todos os RDOs de 30/01/2024 a 30/09/2026 (892 RDOs), com as frentes dos serviços de dez/2024 a mar/2025 definidas na planilha revisada a partir das fotos.
+52. Aba Gráficos abre sem esperar os dados: o cronograma carrega só o mês escolhido, e o efetivo, só quando a aba é aberta.
+53. Efetivo diário somado no próprio banco, numa única consulta, em vez de baixar todas as linhas de mão de obra.
+54. Cronograma desenha uma barra por trecho de dias seguidos, o que mantém "Todo o período" leve com o histórico inteiro.
+
 ---
 
 ## 2. Funções atuais
@@ -171,7 +178,8 @@ Commit desta entrega. SQLs: `rdo360-busca-sem-acentos.sql`, `rdo360-dados-obra.s
 - **Semanas** (segunda a domingo, com o intervalo no eixo, como "25/08 - 31/08") e **meses:** média dos dias que têm RDO, incluindo domingos e feriados registrados.
 - Dica ao passar o mouse e tabela com todos os valores.
 - Mostra só os RDOs que o usuário pode ver.
-- **Cronograma de atividades:** uma linha por atividade, agrupada por frente e na cor dela, marcada em cada dia em que aparece no RDO. Dias seguidos formam uma barra, e dias sem serviço ficam hachurados. Filtra por mês ou todo o período, por frente e por texto (sem diferenciar acentos). Passar o mouse mostra os dias e o período, e clicar abre o RDO daquele dia.
+- O efetivo é somado no banco (função `efetivo_diario`) e só é carregado quando a aba Efetivo é aberta.
+- **Cronograma de atividades:** uma linha por atividade, agrupada por frente e na cor dela, marcada em cada dia em que aparece no RDO. Dias seguidos formam uma barra, e dias sem serviço ficam hachurados. Filtra por mês ou todo o período, por frente e por texto (sem diferenciar acentos). Passar o mouse mostra os dias e o período, e clicar abre o RDO daquele dia. Carrega só o mês escolhido; "Todo o período" busca o histórico inteiro quando é selecionado.
 
 ### Histórico
 
@@ -220,12 +228,14 @@ Administradores têm todas as permissões. As regras valem no banco, não só na
 | 4 | `supabase/rdo360-dados-obra.sql` | Novos campos da obra e armazenamento da logo |
 | 5 | `supabase/rdo360-assinatura.sql` | Assinatura, travamento e permissão de RDOs assinados |
 | 6 | `supabase/rdo360-excluir-rdos.sql` | Exclusão de RDOs por administradores |
+| 7 | `supabase/importacao/importar-parte1` a `parte7` (fora do Git) | Importa os RDOs de 30/01/2024 a 30/09/2026 |
+| 8 | `supabase/rdo360-graficos.sql` | Soma do efetivo diário no banco, para a aba Gráficos |
 
 ---
 
 ## 4. Limitações e próximos passos
 
 - **Multi-obra:** o seletor da aba Dados só tem uma obra, porque o banco comporta apenas uma. Atender várias obras exige ligar RDOs e frentes a cada obra, ter numeração por obra e definir quem acessa cada uma. É melhor fazer isso antes de importar muitos outros meses.
-- **Outros meses:** a importação foi feita só para 01 a 25/10/2026. Os demais meses podem seguir o mesmo processo a partir das planilhas.
+- **Outros meses:** estão importados os RDOs de 30/01/2024 a 05/11/2026, exceto maio/2025 (sem planilha), 26 a 31/12/2024 (sem folha do dia) e dias soltos sem efetivo ou com divergência. Os dias seguintes podem seguir o mesmo processo a partir das planilhas.
 - **Exclusão:** os dados dos lançamentos ficam copiados na tabela `historico`, mas os arquivos de foto são apagados de vez.
 - **Criação de usuários:** a permissão "Alterar RDO's assinados" é definida em "Permissões", depois de criar o usuário.

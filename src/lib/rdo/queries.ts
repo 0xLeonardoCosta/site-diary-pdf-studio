@@ -138,51 +138,71 @@ export const filtroQuery = (userId: string, mes: string) => queryOptions({
     }
   },
 });
-// Daily headcount for every RDO the user can see. Paged: the API returns at most 1000 rows a request.
+/**
+ * Every row of a table the user can see. The API returns at most 1000 rows a request, so the pages
+ * are requested together after a count; one extra page covers rows added in between.
+ */
+async function tabelaInteira<T>(tabela: 'rdos' | 'mao_obra' | 'atividades', colunas: string): Promise<T[]> {
+  const { count, error } = await supabase.from(tabela).select('id', { count: 'exact', head: true });
+  if (error) throw error;
+  const paginas = await Promise.all(Array.from({ length: Math.floor((count ?? 0) / 1000) + 1 }, (_, i) =>
+    supabase.from(tabela).select(colunas).order('id').range(i * 1000, i * 1000 + 999)));
+  const falha = paginas.find(p => p.error)?.error;
+  if (falha) throw falha;
+  return paginas.flatMap(p => p.data as unknown as T[]);
+}
+type RespostaRpc = { data: unknown; error: { code?: string; message: string } | null };
+// Daily headcount by category for every RDO the user can see, oldest first.
 export const efetivoDiarioQuery = (userId: string) => queryOptions({
-  queryKey: ['rdo', userId, 'efetivo-diario'],
+  queryKey: ['rdo', userId, 'efetivo-diario'], staleTime: 60000,
   queryFn: async () => {
-    const rdos: { id: string; data: string }[] = [];
-    for (let start = 0; ; start += 1000) {
-      const { data, error } = await supabase.from('rdos').select('id, data').order('data').order('id').range(start, start + 999);
-      if (error) throw error;
-      rdos.push(...data);
-      if (data.length < 1000) break;
+    // Summed in the database (supabase/rdo360-graficos.sql): one small answer instead of every labor row.
+    const rpc = supabase as unknown as { rpc: (fn: string) => PromiseLike<RespostaRpc> };
+    const { data, error } = await rpc.rpc('efetivo_diario');
+    if (!error) {
+      return (data as [string, number, number, number][]).map(([dia, indireto, direto, terceirizado]) =>
+        ({ data: dia, indireto, direto, terceirizado, total: indireto + direto + terceirizado }));
     }
+    // PGRST202: the function was not created yet; sum the rows here meanwhile.
+    if (error.code !== 'PGRST202') throw error;
+    const [rdos, mao] = await Promise.all([
+      tabelaInteira<{ id: string; data: string }>('rdos', 'id, data'),
+      tabelaInteira<{ rdo_id: string; categoria: string; quantidade: number }>('mao_obra', 'rdo_id, categoria, quantidade'),
+    ]);
     const totais = new Map<string, Record<Categoria, number>>();
-    for (let start = 0; ; start += 1000) {
-      const { data, error } = await supabase.from('mao_obra').select('rdo_id, categoria, quantidade').order('id').range(start, start + 999);
-      if (error) throw error;
-      for (const row of data) {
-        const t = totais.get(row.rdo_id) ?? { indireto: 0, direto: 0, terceirizado: 0 };
-        if (row.categoria in t) t[row.categoria as Categoria] += row.quantidade;
-        totais.set(row.rdo_id, t);
-      }
-      if (data.length < 1000) break;
+    for (const row of mao) {
+      const t = totais.get(row.rdo_id) ?? { indireto: 0, direto: 0, terceirizado: 0 };
+      if (row.categoria in t) t[row.categoria as Categoria] += row.quantidade;
+      totais.set(row.rdo_id, t);
     }
-    return rdos.map(r => {
+    return rdos.sort((a, b) => a.data.localeCompare(b.data)).map(r => {
       const t = totais.get(r.id) ?? { indireto: 0, direto: 0, terceirizado: 0 };
       return { data: r.data, ...t, total: t.indireto + t.direto + t.terceirizado };
     });
   },
 });
-// Every activity of every RDO the user can see, for the schedule. Paged like the headcount.
-export const cronogramaQuery = (userId: string) => queryOptions({
-  queryKey: ['rdo', userId, 'cronograma'],
-  queryFn: async () => {
-    const rdos: { id: string; data: string }[] = [];
-    for (let start = 0; ; start += 1000) {
-      const { data, error } = await supabase.from('rdos').select('id, data').order('data').order('id').range(start, start + 999);
-      if (error) throw error;
-      rdos.push(...data);
-      if (data.length < 1000) break;
+export type DadosCronograma = { rdos: { id: string; data: string }[]; atividades: { rdo_id: string; frente_id: string; descricao: string }[] };
+// Activities for the schedule: one month (YYYY-MM), or the whole history when the period is ''.
+export const cronogramaQuery = (userId: string, periodo: string) => queryOptions({
+  queryKey: ['rdo', userId, 'cronograma', periodo], staleTime: 60000,
+  queryFn: async (): Promise<DadosCronograma> => {
+    if (!periodo) {
+      const [rdos, atividades] = await Promise.all([
+        tabelaInteira<DadosCronograma['rdos'][number]>('rdos', 'id, data'),
+        tabelaInteira<DadosCronograma['atividades'][number]>('atividades', 'rdo_id, frente_id, descricao'),
+      ]);
+      return { rdos, atividades };
     }
-    const atividades: { rdo_id: string; frente_id: string; descricao: string }[] = [];
-    for (let start = 0; ; start += 1000) {
-      const { data, error } = await supabase.from('atividades').select('rdo_id, frente_id, descricao').order('id').range(start, start + 999);
-      if (error) throw error;
-      atividades.push(...data);
-      if (data.length < 1000) break;
+    const { inicio, fim } = limitesMes(periodo);
+    const { data: rdos, error } = await supabase.from('rdos').select('id, data').gte('data', inicio).lt('data', fim).order('data');
+    if (error) throw error;
+    const ids = rdos.map(r => r.id);
+    const atividades: DadosCronograma['atividades'] = [];
+    for (let start = 0; ids.length; start += 1000) {
+      const pagina = await supabase.from('atividades').select('rdo_id, frente_id, descricao').in('rdo_id', ids).order('id').range(start, start + 999);
+      if (pagina.error) throw pagina.error;
+      atividades.push(...pagina.data);
+      if (pagina.data.length < 1000) break;
     }
     return { rdos, atividades };
   },

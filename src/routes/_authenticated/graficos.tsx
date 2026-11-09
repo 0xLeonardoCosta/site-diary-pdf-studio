@@ -1,17 +1,20 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useSuspenseQuery } from '@tanstack/react-query';
+import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { Cronograma } from '@/components/rdo/cronograma';
 import { GraficoEfetivo } from '@/components/rdo/grafico-efetivo';
 import { RdoErro, RdoNaoEncontrado } from '@/components/rdo/query-error';
-import { cronogramaQuery, efetivoDiarioQuery, frentesQuery } from '@/lib/rdo/queries';
+import { cronogramaQuery, efetivoDiarioQuery, filtroQuery, frentesQuery } from '@/lib/rdo/queries';
 
 export const Route = createFileRoute('/_authenticated/graficos')({
-  loader: async ({ context }) => { await Promise.all([
-    context.queryClient.ensureQueryData(efetivoDiarioQuery(context.perfil.id)),
-    context.queryClient.ensureQueryData(cronogramaQuery(context.perfil.id)),
-    context.queryClient.ensureQueryData(frentesQuery(context.perfil.id)),
-  ]); },
+  // Only the light lists block the page; each chart loads its own data with a visible loading state.
+  loader: async ({ context }) => {
+    void context.queryClient.prefetchQuery(efetivoDiarioQuery(context.perfil.id));
+    await Promise.all([
+      context.queryClient.ensureQueryData(filtroQuery(context.perfil.id, '')),
+      context.queryClient.ensureQueryData(frentesQuery(context.perfil.id)),
+    ]);
+  },
   head: () => ({ meta: [
     { title: 'Gráficos | RDO360' },
     { name: 'description', content: 'Efetivo da mão de obra e cronograma das atividades executadas.' },
@@ -26,9 +29,12 @@ function Graficos() {
   const { perfil } = Route.useRouteContext();
   const navigate = useNavigate();
   const [aba, setAba] = useState<(typeof ABAS)[number]['id']>('cronograma');
-  const { data: efetivo } = useSuspenseQuery(efetivoDiarioQuery(perfil.id));
-  const { data: cronograma } = useSuspenseQuery(cronogramaQuery(perfil.id));
+  const { data: rdos } = useSuspenseQuery(filtroQuery(perfil.id, ''));
   const { data: frentes } = useSuspenseQuery(frentesQuery(perfil.id));
+  const meses = useMemo(() => [...new Set(rdos.map(r => r.data.slice(0, 7)))].sort(), [rdos]);
+  const [periodo, setPeriodo] = useState(meses[meses.length - 1] ?? '');
+  const cronograma = useQuery({ ...cronogramaQuery(perfil.id, periodo), enabled: aba === 'cronograma' });
+  const efetivo = useQuery({ ...efetivoDiarioQuery(perfil.id), enabled: aba === 'efetivo' });
   return (
     <main className="mx-auto max-w-4xl space-y-6 px-4 py-8">
       <div>
@@ -43,9 +49,15 @@ function Graficos() {
           </button>
         ))}
       </div>
-      {aba === 'cronograma'
-        ? <Cronograma rdos={cronograma.rdos} atividades={cronograma.atividades} frentes={frentes} aoAbrirDia={data => void navigate({ to: '/rdo/$data', params: { data } })} />
-        : <GraficoEfetivo pontos={efetivo} />}
+      {aba === 'cronograma' ? (
+        cronograma.isError ? <RdoErro error={cronograma.error} /> : (
+          <Cronograma meses={meses} periodo={periodo} aoMudarPeriodo={setPeriodo} frentes={frentes}
+            dados={cronograma.data} carregando={cronograma.isPending}
+            aoAbrirDia={data => void navigate({ to: '/rdo/$data', params: { data } })} />
+        )
+      ) : efetivo.isError ? <RdoErro error={efetivo.error} />
+        : efetivo.data ? <GraficoEfetivo pontos={efetivo.data} />
+        : <p role="status" className="py-10 text-center text-sm text-muted-foreground">Carregando o efetivo…</p>}
     </main>
   );
 }
